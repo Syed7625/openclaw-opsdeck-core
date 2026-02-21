@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import type { Overview } from '../types'
 
@@ -18,11 +18,38 @@ function fmtTime(ms: number | null | undefined) {
   return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
+function sanitizeChatText(input: string) {
+  const text = String(input || '').trim()
+  if (!text) return ''
+
+  const pick = (obj: any) => obj?.payloads?.[0]?.text || obj?.result?.payloads?.[0]?.text || obj?.response?.text || obj?.text
+
+  try {
+    const parsed = JSON.parse(text)
+    const c = pick(parsed)
+    if (typeof c === 'string' && c.trim()) return c.trim()
+  } catch {}
+
+  const payloadMatch = text.match(/"payloads"\s*:\s*\[\s*\{\s*"text"\s*:\s*"((?:\\.|[^"\\])*)"/s)
+  if (payloadMatch?.[1]) {
+    try {
+      return JSON.parse(`"${payloadMatch[1]}"`).trim()
+    } catch {}
+  }
+
+  const jsonTail = text.match(/^(.*?)\s*\{[\s\S]*\}\s*$/)
+  if (jsonTail?.[1]?.trim()) return jsonTail[1].trim()
+
+  return text
+}
+
 export default function CommandPage() {
   const data = useOutletContext<Overview>()
   const [actionMsg, setActionMsg] = useState('')
   const [chatInput, setChatInput] = useState('')
   const [messages, setMessages] = useState<{ id: string; role: 'user' | 'assistant'; text: string; status?: string }[]>([])
+  const [viewStartIndex, setViewStartIndex] = useState(0)
+  const chatLogRef = useRef<HTMLDivElement | null>(null)
 
   const runCron = async (name: string) => {
     const job = data.crons.find((c) => c.name === name)
@@ -44,11 +71,13 @@ export default function CommandPage() {
     let mounted = true
     const load = () => {
       fetch('/api/chat').then((r) => r.json()).then((j) => {
-        if (mounted) setMessages(j.messages || [])
+        if (!mounted) return
+        const cleaned = (j.messages || []).map((m: any) => ({ ...m, text: sanitizeChatText(m.text) }))
+        setMessages(cleaned)
       }).catch(() => {})
     }
     load()
-    const t = setInterval(load, 1500)
+    const t = setInterval(load, 900)
     return () => { mounted = false; clearInterval(t) }
   }, [])
 
@@ -65,7 +94,7 @@ export default function CommandPage() {
           }
         }).catch(() => {})
       }
-    }, 800)
+    }, 350)
     return () => { mounted = false; clearInterval(poll) }
   }, [pendingJobs])
 
@@ -87,6 +116,13 @@ export default function CommandPage() {
     } catch {}
     setSending(false)
   }
+
+  const clearChatView = () => {
+    setViewStartIndex(messages.length)
+    if (chatLogRef.current) chatLogRef.current.scrollTop = 0
+  }
+
+  const visibleMessages = messages.slice(Math.max(viewStartIndex, messages.length - 24))
 
   const positioned = useMemo(() => {
     const active = data.agents.filter((a) => a.state === 'active')
@@ -155,12 +191,15 @@ export default function CommandPage() {
         </aside>
 
         <aside className="chat-column panel chat-panel">
-          <h2>Local Chat</h2>
-          <div className="chat-log full">
-            {messages.slice(-24).map((m) => (
+          <div className="chat-header-row">
+            <h2>Local Chat</h2>
+            <button className="chat-clear-btn" onClick={clearChatView}>Clear View</button>
+          </div>
+          <div className="chat-log full" ref={chatLogRef}>
+            {visibleMessages.map((m) => (
               <div key={m.id} className={`chat-bubble ${m.role} ${m.status === 'error' ? 'error' : ''}`}>
                 <strong>{m.role === 'user' ? 'You' : 'Omar'}</strong>
-                <p>{m.text}</p>
+                <p>{sanitizeChatText(m.text)}</p>
                 {m.status && m.status !== 'delivered' && <span className={`chat-status ${m.status}`}>{m.status}</span>}
               </div>
             ))}

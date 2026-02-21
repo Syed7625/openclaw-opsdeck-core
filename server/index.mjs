@@ -95,16 +95,14 @@ const PROJECT_CRON_MAP = {
 }
 
 async function getProjects() {
-  const out = []
-  for (const p of PROJECTS) {
+  return Promise.all(PROJECTS.map(async (p) => {
     try {
       const dirty = Number(await runText(`cd ${JSON.stringify(p.path)} && git status --porcelain | wc -l | tr -d ' '`))
-      out.push({ name: p.name, key: p.key, status: dirty > 0 ? 'dirty' : 'clean' })
+      return { name: p.name, key: p.key, status: dirty > 0 ? 'dirty' : 'clean' }
     } catch {
-      out.push({ name: p.name, key: p.key, status: 'unknown' })
+      return { name: p.name, key: p.key, status: 'unknown' }
     }
-  }
-  return out
+  }))
 }
 
 async function getProjectDetails(crons) {
@@ -236,6 +234,8 @@ function buildMetrics(agents, projects, crons) {
 // ─── Caches ─────────────────────────────────────────────────────────────────
 
 const overviewCache = { ts: 0, data: null }
+const fastOverviewCache = { ts: 0, data: null, refreshing: false }
+const heavyOverviewCache = { ts: 0, data: { projectDetails: {}, skills: [], repos: [] }, refreshing: false }
 const repoCache = { ts: 0, data: [] }
 const localRepoIndexCache = { ts: 0, map: new Map() }
 
@@ -251,36 +251,58 @@ function extractAgentText(raw = '') {
   const text = String(raw || '').trim()
   if (!text) return 'No reply body returned.'
 
+  const pickCandidate = (parsed) => {
+    if (!parsed || typeof parsed !== 'object') return null
+    const candidate =
+      parsed?.payloads?.[0]?.text ||
+      parsed?.result?.payloads?.[0]?.text ||
+      parsed?.response?.text ||
+      parsed?.result?.response?.text ||
+      parsed?.text ||
+      parsed?.output
+    return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : null
+  }
+
   // Try parsing as JSON and extracting known fields
   try {
     const parsed = JSON.parse(text)
-    if (typeof parsed === 'object' && parsed !== null) {
-      const candidate = parsed?.payloads?.[0]?.text || parsed?.response?.text || parsed?.text || parsed?.output
-      if (typeof candidate === 'string' && candidate.trim()) return candidate.trim()
-    }
+    const candidate = pickCandidate(parsed)
+    if (candidate) return candidate
   } catch {}
 
-  // Try extracting embedded JSON object
+  // Try extracting embedded JSON object from mixed text like: "prefix { ...json... }"
   const start = text.indexOf('{')
   const end = text.lastIndexOf('}')
   if (start >= 0 && end > start) {
     try {
       const parsed = JSON.parse(text.slice(start, end + 1))
-      const candidate = parsed?.response?.text || parsed?.text || parsed?.output
-      if (typeof candidate === 'string' && candidate.trim()) return candidate.trim()
+      const candidate = pickCandidate(parsed)
+      if (candidate) return candidate
     } catch {}
   }
+
+  // Heuristic: extract payload text directly from JSON-like blobs
+  const payloadTextMatch = text.match(/"payloads"\s*:\s*\[\s*\{\s*"text"\s*:\s*"((?:\\.|[^"\\])*)"/s)
+  if (payloadTextMatch?.[1]) {
+    try {
+      const decoded = JSON.parse(`"${payloadTextMatch[1]}"`)
+      if (typeof decoded === 'string' && decoded.trim()) return decoded.trim().slice(0, 3000)
+    } catch {}
+  }
+
+  // If line contains inline JSON tail, strip it
+  const noInlineJson = text.replace(/\s*\{[\s\S]*\}\s*$/, '').trim()
+  if (noInlineJson && noInlineJson !== text) return noInlineJson.slice(0, 3000)
 
   // Filter out lines that look like raw JSON
   const lines = text.split('\n')
   const clean = lines.filter((l) => {
     const t = l.trim()
     if (!t) return false
-    // Skip lines that are pure JSON objects/arrays
     if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
       try { JSON.parse(t); return false } catch { return true }
     }
-    return true
+    return !/^\s*"?(runId|status|summary|result|meta|payloads)"?\s*:/.test(t)
   })
 
   return (clean.join('\n') || 'Relay returned non-text payload.').slice(0, 3000)
@@ -292,12 +314,12 @@ function pushChatMsg(msg) {
   if (chatHistory.length > 200) chatHistory.splice(0, chatHistory.length - 200)
 }
 
-async function executeRelay(text, retries = 1) {
-  const cmd = `openclaw --no-color agent --agent main --message ${JSON.stringify(text)} --session-id ${CHAT_SESSION_ID} --json --timeout 20`
+async function executeRelay(text, retries = 0) {
+  const cmd = `openclaw --no-color agent --agent main --message ${JSON.stringify(text)} --session-id ${CHAT_SESSION_ID} --json --timeout 12`
   let lastErr
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const raw = await runText(cmd, 25000)
+      const raw = await runText(cmd, 14000)
       return extractAgentText(raw)
     } catch (err) {
       lastErr = err
@@ -363,29 +385,59 @@ async function processJob(jobId, text) {
 
 app.get('/api/health', async () => ({ ok: true }))
 
-app.get('/api/overview', async () => {
+async function refreshFastOverview() {
+  if (fastOverviewCache.refreshing) return
+  fastOverviewCache.refreshing = true
   try {
-    const now = Date.now()
-    if (overviewCache.data && (now - overviewCache.ts) < 10000) {
-      return overviewCache.data
-    }
-
-    const [agents, crons, projects, skills, repos] = await Promise.all([
-      getSessions(), getCrons(), getProjects(), getSkillsOverview(), getRepoGrid()
-    ])
-    const projectDetails = await getProjectDetails(crons)
+    const [agents, crons, projects] = await Promise.all([getSessions(), getCrons(), getProjects()])
     const alerts = deriveAlerts(agents, projects, crons)
     const timeline = buildTimeline(crons, projects)
     const metrics = buildMetrics(agents, projects, crons)
-    const payload = { ok: true, ts: now, agents, crons, projects, projectDetails, skills, alerts, timeline, metrics, repos }
-    overviewCache.ts = now
-    overviewCache.data = payload
-    return payload
-  } catch (error) {
-    // Return stale cache if available
-    if (overviewCache.data) return { ...overviewCache.data, stale: true }
-    return { ok: false, error: String(error) }
+    fastOverviewCache.data = { agents, crons, projects, alerts, timeline, metrics }
+    fastOverviewCache.ts = Date.now()
+  } finally {
+    fastOverviewCache.refreshing = false
   }
+}
+
+async function refreshHeavyOverview(crons = []) {
+  if (heavyOverviewCache.refreshing) return
+  heavyOverviewCache.refreshing = true
+  try {
+    const [projectDetails, skills, repos] = await Promise.all([
+      getProjectDetails(crons),
+      getSkillsOverview(),
+      getRepoGrid(),
+    ])
+    heavyOverviewCache.data = { projectDetails, skills, repos }
+    heavyOverviewCache.ts = Date.now()
+  } finally {
+    heavyOverviewCache.refreshing = false
+  }
+}
+
+app.get('/api/overview', async () => {
+  const now = Date.now()
+
+  if (overviewCache.data && (now - overviewCache.ts) < 1500) {
+    return overviewCache.data
+  }
+
+  const fast = fastOverviewCache.data || { agents: [], crons: [], projects: [], alerts: [{ level: 'info', text: 'Refreshing mission state...' }], timeline: [], metrics: { activeAgents: 0, dirtyProjects: 0, cronHealthyPct: 0, nextCronAtMs: null } }
+  const heavy = heavyOverviewCache.data || { projectDetails: {}, skills: [], repos: [] }
+
+  const payload = {
+    ok: true,
+    ts: now,
+    ...fast,
+    ...heavy,
+    fastStale: !fastOverviewCache.ts || (now - fastOverviewCache.ts) > 20000,
+    heavyStale: !heavyOverviewCache.ts || (now - heavyOverviewCache.ts) > 90000,
+  }
+
+  overviewCache.ts = now
+  overviewCache.data = payload
+  return payload
 })
 
 // Chat history — always fast
@@ -424,6 +476,14 @@ app.get('/api/meta', async () => {
 })
 
 // ─── Start ──────────────────────────────────────────────────────────────────
+
+// Background refresh loops keep /api/overview fast and non-blocking.
+setTimeout(() => {
+  refreshFastOverview().catch(() => {})
+  refreshHeavyOverview((fastOverviewCache.data?.crons) || []).catch(() => {})
+}, 200)
+setInterval(() => { refreshFastOverview().catch(() => {}) }, 10000).unref()
+setInterval(() => { refreshHeavyOverview((fastOverviewCache.data?.crons) || []).catch(() => {}) }, 90000).unref()
 
 const port = Number(process.env.OPSDECK_API_PORT || 4174)
 const host = process.env.OPSDECK_API_HOST || '0.0.0.0'

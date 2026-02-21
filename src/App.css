@@ -21,11 +21,11 @@ main { min-height: 100vh; color: var(--text); background: radial-gradient(circle
 .page-wrap { position: relative; z-index: 1; }
 .pill { font-size:.68rem; padding:4px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.25);} .pill.live{color:var(--green);border-color:var(--green)} .pill.fallback{color:var(--danger);border-color:var(--danger)}
 .layout { display:grid; grid-template-columns:1fr 320px; gap:16px; height: calc(100vh - 145px); }
-.command-layout{display:grid; gap:12px}
-.command-main-grid{display:grid; grid-template-columns:500px 240px minmax(360px,1fr); gap:12px; align-items:start}
+.command-layout{display:grid; gap:12px; height:calc(100vh - 145px); min-height:0; overflow:hidden}
+.command-main-grid{display:grid; grid-template-columns:500px 240px minmax(360px,1fr); gap:12px; align-items:stretch; min-height:0; overflow:hidden}
 .table-wrap { position:relative; border:1px solid rgba(0,240,255,.35); border-radius:16px; background:radial-gradient(circle, rgba(0,240,255,.06), rgba(9,11,17,.7)); min-height:520px }
 .table-core { position:absolute; left:50%; top:50%; width:220px; height:220px; transform:translate(-50%,-50%); border-radius:50%; border:1px solid rgba(0,240,255,.45); box-shadow:0 0 45px rgba(0,240,255,.28); }
-.table-wrap.compact{min-height:520px; width:560px; max-width:100%}
+.table-wrap.compact{min-height:0; height:100%; width:560px; max-width:100%}
 .table-core.compact{width:170px;height:170px}
 .ring{position:absolute; inset:-26px; border-radius:50%; border:1px dashed rgba(255,54,212,.38)} .ring-2{inset:-52px; border-color:rgba(36,255,114,.22)}
 .label{position:absolute; inset:0; display:grid; place-content:center; color:var(--muted); letter-spacing:.16em; font-size:.75rem}
@@ -52,17 +52,21 @@ em.unknown { color: var(--muted); font-style: normal; }
 .alert-card.warn{border-color:var(--magenta)}
 .alert-card.info{border-color:var(--cyan)}
 .score-column{display:grid; gap:12px}
-.control-column{display:grid; gap:12px}
-.chat-column{display:grid; gap:8px; min-height:0; max-height:calc(100vh - 220px)}
+.control-column{display:grid; gap:12px; min-height:0; overflow:auto}
+.chat-column{display:grid; gap:8px; min-height:0; height:100%; max-height:100%; overflow:hidden}
 .compact-score{padding:10px}
 .score{font-size:1.6rem; font-weight:700; color:var(--cyan); margin-bottom:4px}
 .quick-actions{display:grid; gap:6px}
 .quick-actions button{background:rgba(0,240,255,.08); border:1px solid rgba(0,240,255,.35); color:var(--text); border-radius:8px; padding:7px; font-size:.72rem; text-align:left; cursor:pointer}
 .action-msg{margin-top:8px; font-size:.72rem; color:var(--cyan)}
 .timeline-panel{max-height:240px; overflow:auto}
-.chat-panel{display:grid; gap:8px}
-.chat-log{max-height:220px; overflow:auto; display:grid; gap:6px; padding-right:2px}
-.chat-log.full{max-height:none; height:100%; min-height:380px}
+.chat-panel{display:grid; gap:8px; min-height:0; grid-template-rows:auto minmax(0,1fr) auto}
+.chat-header-row{display:flex; align-items:center; justify-content:space-between; gap:8px}
+.chat-header-row h2{margin:0}
+.chat-clear-btn{background:rgba(255,255,255,.04); border:1px solid rgba(143,163,199,.35); color:var(--muted); border-radius:8px; padding:5px 8px; font-size:.66rem; cursor:pointer}
+.chat-clear-btn:hover{color:var(--text); border-color:var(--cyan)}
+.chat-log{max-height:220px; overflow:auto; display:grid; gap:6px; padding-right:2px; min-height:0}
+.chat-log.full{max-height:none; height:auto; min-height:0}
 .chat-bubble{border:1px solid rgba(143,163,199,.25); border-radius:8px; padding:6px 8px; background:rgba(255,255,255,.02)}
 .chat-bubble strong{font-size:.62rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted)}
 .chat-bubble p{margin:.25rem 0 0; font-size:.74rem; white-space:pre-wrap}
