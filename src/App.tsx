@@ -20,10 +20,7 @@ export default function App() {
 
       <nav className="nav">
         <NavLink to="/">Command</NavLink>
-        <NavLink to="/sites">Sites</NavLink>
         <NavLink to="/crons">Crons</NavLink>
-        <NavLink to="/forge">Forge</NavLink>
-        <NavLink to="/repos">Repos</NavLink>
       </nav>
 
       <section className="page-wrap">

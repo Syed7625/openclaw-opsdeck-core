@@ -9,7 +9,7 @@ export const fallback: Overview = {
     { id: 'opie', name: 'Opie', state: 'idle', load: 10 },
     { id: 'buzz', name: 'Buzz', state: 'idle', load: 18 },
   ],
-  projects: [{ name: 'Ancient Travels', key: 'ancienttravel', status: 'shipping' }, { name: 'OmarCMS', key: 'omarcms', status: 'stable' }],
+  projects: [],
   crons: [],
   projectDetails: {},
   skills: [],

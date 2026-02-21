@@ -9,7 +9,7 @@ const app = Fastify({ logger: false })
 
 await app.register(cors, { origin: true })
 
-const TOOL_PATH = `/usr/local/Cellar/node@22/22.22.0/bin:${process.env.PATH || ''}`
+const TOOL_PATH = process.env.PATH || ''
 
 // ─── Exec helpers ───────────────────────────────────────────────────────────
 
@@ -123,19 +123,9 @@ async function getSessions() {
   return roster.map((name) => byName.get(name))
 }
 
-const PROJECTS = [
-  { name: 'Ancient Travels', path: '/Users/ewimsatt/Sites/ancienttravel', key: 'ancienttravel' },
-  { name: 'OmarCMS', path: '/Users/ewimsatt/Sites/omarcms', key: 'omarcms' },
-  { name: 'LandingPageAI', path: '/Users/ewimsatt/Sites/landingpageai', key: 'landingpageai' },
-  { name: 'OpenClaw Fork', path: '/Users/ewimsatt/openclaw', key: 'openclaw' },
-]
+const PROJECTS = []
 
-const PROJECT_CRON_MAP = {
-  ancienttravel: ['Micro Heartbeat (Night)'],
-  omarcms: ['Night Owl: Writing & Reflection', 'Night Owl: Skill Building & Code', 'OmarCMS Daily Publish'],
-  landingpageai: [],
-  openclaw: ['Upstream OpenClaw Monitor'],
-}
+const PROJECT_CRON_MAP = {}
 
 async function getProjects() {
   return Promise.all(PROJECTS.map(async (p) => {
@@ -174,74 +164,15 @@ async function getProjectDetails(crons) {
 }
 
 async function getSkillsOverview() {
-  const paths = ['/Users/ewimsatt/openclaw/skills', '/Users/ewimsatt/.openclaw/workspace/skills']
-  const groups = []
-  for (const base of paths) {
-    try {
-      const list = await runText(`find ${JSON.stringify(base)} -maxdepth 1 -mindepth 1 -type d -exec basename {} \\; | sort`)
-      groups.push({ base, skills: list ? list.split('\n').filter(Boolean) : [] })
-    } catch {
-      groups.push({ base, skills: [] })
-    }
-  }
-  return groups
+  return []
 }
 
 async function getLocalRepoIndex() {
-  const now = Date.now()
-  if (localRepoIndexCache.map.size && (now - localRepoIndexCache.ts) < 60000) return localRepoIndexCache.map
-  const roots = ['/Users/ewimsatt/Sites', '/Users/ewimsatt/frameworks', '/Users/ewimsatt/.openclaw/workspace', '/Users/ewimsatt/openclaw']
-  const found = new Map()
-  for (const root of roots) {
-    try {
-      const raw = await runText(`find ${JSON.stringify(root)} -maxdepth 3 -type d -name .git -print | sed 's#/\\.git$##'`)
-      for (const d of (raw ? raw.split('\n').filter(Boolean) : [])) {
-        const name = d.split('/').pop()
-        if (!found.has(name)) found.set(name, d)
-      }
-    } catch {}
-  }
-  localRepoIndexCache.ts = now
-  localRepoIndexCache.map = found
-  return found
+  return new Map()
 }
 
 async function getRepoGrid() {
-  const now = Date.now()
-  if (repoCache.data.length && (now - repoCache.ts) < 60000) return repoCache.data
-
-  let repos = []
-  try {
-    const raw = await runText('gh repo list ewimsatt --limit 40 --json name,nameWithOwner,isPrivate')
-    repos = JSON.parse(raw)
-  } catch { repos = [] }
-
-  const localIndex = await getLocalRepoIndex()
-  const out = []
-
-  for (const r of repos) {
-    const localPath = localIndex.get(r.name) || null
-    if (!localPath) {
-      out.push({ name: r.name, fullName: r.nameWithOwner, localPath: null, state: 'missing', ahead: 0, behind: 0, dirty: 0, ageDays: null, heat: 'cool' })
-      continue
-    }
-    let ahead = 0, behind = 0, dirty = 0, ageDays = null
-    try {
-      dirty = Number(await runText(`cd ${JSON.stringify(localPath)} && git status --porcelain | wc -l | tr -d ' '`))
-      const lr = await runText(`cd ${JSON.stringify(localPath)} && git rev-list --left-right --count @{u}...HEAD 2>/dev/null || echo "0 0"`)
-      const parts = lr.split(/\s+/).map((x) => Number(x || 0))
-      behind = parts[0] || 0; ahead = parts[1] || 0
-      const ts = Number(await runText(`cd ${JSON.stringify(localPath)} && git log -1 --format=%ct 2>/dev/null || echo 0`))
-      if (ts > 0) ageDays = Math.floor((Date.now() / 1000 - ts) / 86400)
-    } catch {}
-
-    const synced = dirty === 0 && ahead === 0 && behind === 0
-    out.push({ name: r.name, fullName: r.nameWithOwner, localPath, state: synced ? 'synced' : 'outdated', ahead, behind, dirty, ageDays, heat: ageDays === null ? 'cool' : ageDays > 30 ? 'hot' : ageDays > 14 ? 'warm' : 'cool' })
-  }
-
-  repoCache.ts = now
-  repoCache.data = out
-  return out
+  return []
 }
 
 // ─── Derived data ───────────────────────────────────────────────────────────

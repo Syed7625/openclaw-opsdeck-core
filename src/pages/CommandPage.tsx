@@ -170,10 +170,10 @@ export default function CommandPage() {
           <div className="panel">
             <h2>Quick Actions</h2>
             <div className="quick-actions">
-              <button onClick={() => runCron('Client Context Brief (Weekday Morning)')}>Run Morning Brief</button>
-              <button onClick={() => runCron('OmarCMS Daily Publish')}>Run Publish</button>
-              <button onClick={() => runCron('Micro Heartbeat (Night)')}>Run Heartbeat</button>
-              <button onClick={() => runCron('Night Owl: Skill Building & Code')}>Run 3AM Code</button>
+              {(data.crons || []).slice(0, 4).map((c) => (
+                <button key={c.id} onClick={() => runCron(c.name)}>Run {c.name}</button>
+              ))}
+              {(!data.crons || data.crons.length === 0) && <div className="row"><span>No cron actions configured</span></div>}
             </div>
             {actionMsg && <div className="action-msg">{actionMsg}</div>}
           </div>
