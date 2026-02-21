@@ -102,7 +102,7 @@ function extractAgentText(raw = '') {
 
   try {
     const parsed = JSON.parse(text)
-    return parsed?.response?.text || parsed?.text || parsed?.output || 'No reply body returned.'
+    return parsed?.payloads?.[0]?.text || parsed?.response?.text || parsed?.text || parsed?.output || 'No reply body returned.'
   } catch {}
 
   const start = text.indexOf('{')
@@ -341,7 +341,7 @@ app.post('/api/chat', async (req, reply) => {
   chatHistory.push(userMsg)
 
   try {
-    const cmd = `openclaw --no-color agent --agent main --message ${JSON.stringify(text)} --json --timeout 20`
+    const cmd = `openclaw --no-color agent --local --agent main --session-id mission-control-local --message ${JSON.stringify(text)} --json --timeout 20`
     const raw = await runText(cmd, 22000)
     const replyText = extractAgentText(raw)
     const aiMsg = { id: `a-${Date.now()}`, role: 'assistant', text: replyText, ts: Date.now() }
