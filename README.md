@@ -140,4 +140,4 @@ opsdeck.config.example.js     — Sample configuration (copy to opsdeck.config.j
 
 ## License
 
-[MIT](LICENSE) — do whatever you want with it.
+[MIT](LICENSE) — do whatever you want, just keep my name on it.
