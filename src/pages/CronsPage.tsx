@@ -1,9 +1,14 @@
 import { useOutletContext } from 'react-router-dom'
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import type { Overview } from '../types'
+
+function fmt(ms: number | null) {
+  if (!ms) return 'n/a'
+  return new Date(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+}
 
 export default function CronsPage() {
   const data = useOutletContext<Overview>()
-  const chart = data.crons.slice(0, 8).map((c, i) => ({ name: c.name.slice(0, 10), val: c.enabled ? 80 - i * 6 : 20 }))
-  return <div className="chart-page"><div className="panel chart-panel"><h2>Cron Radar</h2><div style={{ width: '100%', height: 420 }}><ResponsiveContainer><RadarChart data={chart}><PolarGrid /><PolarAngleAxis dataKey="name" /><Radar dataKey="val" stroke="#00f0ff" fill="#00f0ff" fillOpacity={0.35} /></RadarChart></ResponsiveContainer></div></div></div>
+  const upcoming = [...data.crons].sort((a, b) => (a.nextRunAtMs || 0) - (b.nextRunAtMs || 0))
+
+  return <div className="panel"><h2>Cron Timeline (Upcoming)</h2>{upcoming.map((c) => <div className="row" key={c.id}><span>{c.name}</span><em className={c.lastStatus === 'ok' ? 'clean' : 'dirty'}>{fmt(c.nextRunAtMs)}</em></div>)}</div>
 }

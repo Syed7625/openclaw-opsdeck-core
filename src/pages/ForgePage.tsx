@@ -1,12 +1,20 @@
-const items = [
-  'frameworks/waypoint-cms',
-  'frameworks/omarcms-template',
-  'frameworks/seo-audit-hub',
-  'scripts/technical-audit',
-  'scripts/space-to-csv',
-  'scripts/scraper',
-]
+import { useOutletContext } from 'react-router-dom'
+import type { Overview } from '../types'
 
 export default function ForgePage() {
-  return <div className="grid-page">{items.map((x) => <div className="tile" key={x}><h3>{x.split('/').pop()}</h3><p>{x}</p></div>)}</div>
+  const data = useOutletContext<Overview>()
+
+  return (
+    <div className="grid-page">
+      {(data.skills || []).map((group) => (
+        <div className="tile" key={group.base}>
+          <h3>{group.base.includes('/workspace/') ? 'Workspace Skills' : 'Core Skills'}</h3>
+          <p>{group.base}</p>
+          <div className="skills-wrap">
+            {group.skills.slice(0, 24).map((s) => <span className="skill-chip" key={s}>{s}</span>)}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }

@@ -44,55 +44,133 @@ function aliasNameFromModel(model = '') {
 async function getSessions() {
   const data = await runJson('openclaw sessions --json')
   const now = Date.now()
-  const list = (data.sessions || [])
+
+  const roster = ['Omar', 'Will', 'Opie', 'Elon', 'Buzz', 'Kite']
+  const byName = new Map(roster.map((name) => [name, { id: name.toLowerCase(), name, state: 'idle', load: 0 }]))
+
+  const sessions = (data.sessions || [])
     .filter((s) => s.key?.includes(':subagent:') || s.key === 'agent:main:main')
-    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-    .slice(0, 12)
 
-  const counts = new Map()
+  for (const s of sessions) {
+    const name = s.key === 'agent:main:main' ? 'Omar' : aliasNameFromModel(s.modelOverride || s.model || '')
+    if (!byName.has(name)) continue
 
-  return list.map((s, idx) => {
     const ageMin = (now - (s.updatedAt || now)) / 60000
-    const state = ageMin <= 2 ? 'active' : 'idle'
-    const base = s.key === 'agent:main:main' ? 'Omar' : aliasNameFromModel(s.modelOverride || s.model || '')
-    const n = (counts.get(base) || 0) + 1
-    counts.set(base, n)
-    const short = (s.key || '').split(':').pop()?.slice(0, 4) || String(idx)
-    const name = n === 1 ? base : `${base}-${short}`
+    const active = ageMin <= 2
+    const current = byName.get(name)
+    const sessionLoad = Math.min(100, Math.max(0, Math.round((s.totalTokens || 0) / 3000)))
 
-    return {
-      id: s.key || String(idx),
+    byName.set(name, {
+      id: current.id,
       name,
-      state,
-      load: Math.min(100, Math.max(0, Math.round((s.totalTokens || 0) / 3000))),
-    }
-  })
+      state: active ? 'active' : current.state,
+      load: Math.max(current.load, sessionLoad),
+    })
+  }
+
+  return roster.map((name) => byName.get(name))
+}
+
+const PROJECTS = [
+  { name: 'Ancient Travels', path: '/Users/ewimsatt/Sites/ancienttravel', key: 'ancienttravel' },
+  { name: 'OmarCMS', path: '/Users/ewimsatt/Sites/omarcms', key: 'omarcms' },
+  { name: 'LandingPageAI', path: '/Users/ewimsatt/Sites/landingpageai', key: 'landingpageai' },
+  { name: 'OpenClaw Fork', path: '/Users/ewimsatt/openclaw', key: 'openclaw' },
+]
+
+const PROJECT_CRON_MAP = {
+  ancienttravel: ['Micro Heartbeat (Night)'],
+  omarcms: ['Night Owl: Writing & Reflection', 'Night Owl: Skill Building & Code', 'OmarCMS Daily Publish'],
+  landingpageai: [],
+  openclaw: ['Upstream OpenClaw Monitor'],
+}
+
+async function runText(command) {
+  const full = `${SHELL_PREFIX}${command}`
+  const { stdout } = await exec(`bash -lc ${JSON.stringify(full)}`, { maxBuffer: 10 * 1024 * 1024 })
+  return stdout.trim()
 }
 
 async function getProjects() {
-  const projects = [
-    { name: 'Ancient Travels', path: '/Users/ewimsatt/Sites/ancienttravel' },
-    { name: 'OmarCMS', path: '/Users/ewimsatt/Sites/omarcms' },
-    { name: 'OpenClaw Fork', path: '/Users/ewimsatt/openclaw' },
-  ]
   const out = []
-  for (const p of projects) {
+  for (const p of PROJECTS) {
     try {
-      const cmd = `${SHELL_PREFIX}cd ${JSON.stringify(p.path)} && git status --porcelain | wc -l | tr -d ' '`
-      const { stdout } = await exec(`bash -lc ${JSON.stringify(cmd)}`)
-      const dirty = Number(stdout.trim() || '0')
-      out.push({ name: p.name, status: dirty > 0 ? 'dirty' : 'clean' })
+      const dirty = Number(await runText(`cd ${JSON.stringify(p.path)} && git status --porcelain | wc -l | tr -d ' '`))
+      out.push({ name: p.name, key: p.key, status: dirty > 0 ? 'dirty' : 'clean' })
     } catch {
-      out.push({ name: p.name, status: 'unknown' })
+      out.push({ name: p.name, key: p.key, status: 'unknown' })
     }
   }
   return out
 }
 
+async function getProjectDetails(crons) {
+  const details = {}
+  for (const p of PROJECTS) {
+    let lastCommit = 'unknown'
+    let recent = []
+    let dirtyCount = null
+    try {
+      lastCommit = await runText(`cd ${JSON.stringify(p.path)} && git log -1 --pretty=format:%h' - '%s' ('%cr')`)
+      const recentRaw = await runText(`cd ${JSON.stringify(p.path)} && git log -5 --pretty=format:%s`)
+      recent = recentRaw ? recentRaw.split('\n').filter(Boolean) : []
+      dirtyCount = Number(await runText(`cd ${JSON.stringify(p.path)} && git status --porcelain | wc -l | tr -d ' '`))
+    } catch {}
+
+    const scheduled = (PROJECT_CRON_MAP[p.key] || []).map((name) => {
+      const job = crons.find((c) => c.name === name)
+      return job ? { name: job.name, nextRunAtMs: job.nextRunAtMs, status: job.lastStatus } : { name, nextRunAtMs: null, status: 'unknown' }
+    })
+
+    const done = scheduled.filter((s) => s.status === 'ok').map((s) => `${s.name}: last run ok`)
+    const inProgress = dirtyCount && dirtyCount > 0 ? [`Working tree has ${dirtyCount} changed files`] : []
+
+    details[p.key] = {
+      key: p.key,
+      name: p.name,
+      status: dirtyCount === null ? 'unknown' : dirtyCount > 0 ? 'dirty' : 'clean',
+      lastCommit,
+      recent,
+      scheduled,
+      inProgress,
+      done,
+    }
+  }
+  return details
+}
+
+async function getSkillsOverview() {
+  const paths = [
+    '/Users/ewimsatt/openclaw/skills',
+    '/Users/ewimsatt/.openclaw/workspace/skills',
+  ]
+  const groups = []
+  for (const base of paths) {
+    try {
+      const list = await runText(`find ${JSON.stringify(base)} -maxdepth 1 -mindepth 1 -type d -exec basename {} \\; | sort`)
+      groups.push({ base, skills: list ? list.split('\n').filter(Boolean) : [] })
+    } catch {
+      groups.push({ base, skills: [] })
+    }
+  }
+  return groups
+}
+
+const overviewCache = { ts: 0, data: null }
+
 app.get('/api/overview', async () => {
   try {
-    const [agents, crons, projects] = await Promise.all([getSessions(), getCrons(), getProjects()])
-    return { ok: true, ts: Date.now(), agents, crons, projects }
+    const now = Date.now()
+    if (overviewCache.data && (now - overviewCache.ts) < 10000) {
+      return overviewCache.data
+    }
+
+    const [agents, crons, projects, skills] = await Promise.all([getSessions(), getCrons(), getProjects(), getSkillsOverview()])
+    const projectDetails = await getProjectDetails(crons)
+    const payload = { ok: true, ts: now, agents, crons, projects, projectDetails, skills }
+    overviewCache.ts = now
+    overviewCache.data = payload
+    return payload
   } catch (error) {
     return { ok: false, error: String(error) }
   }
