@@ -37,7 +37,18 @@ export default function CommandPage() {
   }
 
   useEffect(() => {
-    fetch('/api/chat').then((r) => r.json()).then((j) => setMessages(j.messages || [])).catch(() => {})
+    let mounted = true
+    const load = () => {
+      fetch('/api/chat').then((r) => r.json()).then((j) => {
+        if (mounted) setMessages(j.messages || [])
+      }).catch(() => {})
+    }
+    load()
+    const t = setInterval(load, 2500)
+    return () => {
+      mounted = false
+      clearInterval(t)
+    }
   }, [])
 
   const sendChat = async () => {

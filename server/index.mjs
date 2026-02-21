@@ -87,12 +87,37 @@ const PROJECT_CRON_MAP = {
   openclaw: ['Upstream OpenClaw Monitor'],
 }
 
-async function runText(command) {
+async function runText(command, timeoutMs = 30000) {
   const { stdout } = await exec(`bash -lc ${JSON.stringify(command)}`, {
     maxBuffer: 10 * 1024 * 1024,
+    timeout: timeoutMs,
     env: { ...process.env, PATH: TOOL_PATH },
   })
   return stdout.trim()
+}
+
+function extractAgentText(raw = '') {
+  const text = String(raw || '').trim()
+  if (!text) return 'No reply body returned.'
+
+  try {
+    const parsed = JSON.parse(text)
+    return parsed?.response?.text || parsed?.text || parsed?.output || 'No reply body returned.'
+  } catch {}
+
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    const maybe = text.slice(start, end + 1)
+    try {
+      const parsed = JSON.parse(maybe)
+      return parsed?.response?.text || parsed?.text || parsed?.output || text
+    } catch {}
+  }
+
+  const lines = text.split('\n').filter(Boolean)
+  const nonJson = lines.filter((l) => !l.trim().startsWith('{') && !l.trim().startsWith('['))
+  return (nonJson.join('\n') || 'Relay returned non-text payload.').slice(0, 3000)
 }
 
 async function getProjects() {
@@ -316,20 +341,14 @@ app.post('/api/chat', async (req, reply) => {
   chatHistory.push(userMsg)
 
   try {
-    const cmd = `openclaw agent --agent main --message ${JSON.stringify(text)} --json`
-    const raw = await runText(cmd)
-    let replyText = 'No reply body returned.'
-    try {
-      const parsed = JSON.parse(raw)
-      replyText = parsed?.response?.text || parsed?.text || parsed?.output || raw
-    } catch {
-      replyText = raw || 'No reply body returned.'
-    }
+    const cmd = `openclaw --no-color agent --agent main --message ${JSON.stringify(text)} --json --timeout 20`
+    const raw = await runText(cmd, 22000)
+    const replyText = extractAgentText(raw)
     const aiMsg = { id: `a-${Date.now()}`, role: 'assistant', text: replyText, ts: Date.now() }
     chatHistory.push(aiMsg)
     return { ok: true, message: aiMsg }
   } catch (error) {
-    const errText = `Local agent relay failed: ${String(error)}`
+    const errText = `Relay timeout/failure. Message was sent, but response couldn't be rendered locally yet. (${String(error).slice(0, 180)})`
     const aiMsg = { id: `a-${Date.now()}`, role: 'assistant', text: errText, ts: Date.now() }
     chatHistory.push(aiMsg)
     return reply.code(200).send({ ok: true, message: aiMsg, degraded: true })
