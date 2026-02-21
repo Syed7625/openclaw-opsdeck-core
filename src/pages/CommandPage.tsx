@@ -68,15 +68,17 @@ export default function CommandPage() {
           {positioned.map(a => <div key={a.id} className={`agent ${a.state}`} style={{ transform: `translate(calc(-50% + ${a.x}px), calc(-50% + ${a.y}px))` }}><strong>{a.name}</strong><small>{a.role}</small></div>)}
         </div>
 
-        <aside className="sidepanel">
-          <div className="panel">
+        <aside className="score-column">
+          <div className="panel compact-score">
             <h2>Daily Score</h2>
             <div className="score">{Math.max(0, (data.metrics?.cronHealthyPct || 0) - (data.metrics?.dirtyProjects || 0) * 10)}</div>
-            <div className="row"><span>Active Agents</span><em>{data.metrics?.activeAgents ?? 0}</em></div>
-            <div className="row"><span>Dirty Projects</span><em>{data.metrics?.dirtyProjects ?? 0}</em></div>
-            <div className="row"><span>Cron Health</span><em>{data.metrics?.cronHealthyPct ?? 0}%</em></div>
+            <div className="row"><span>Agents</span><em>{data.metrics?.activeAgents ?? 0}</em></div>
+            <div className="row"><span>Dirty</span><em>{data.metrics?.dirtyProjects ?? 0}</em></div>
+            <div className="row"><span>Cron %</span><em>{data.metrics?.cronHealthyPct ?? 0}%</em></div>
           </div>
+        </aside>
 
+        <aside className="sidepanel">
           <div className="panel">
             <h2>Quick Actions</h2>
             <div className="quick-actions">
@@ -86,6 +88,12 @@ export default function CommandPage() {
               <button onClick={() => runCron('Night Owl: Skill Building & Code')}>Run 3AM Code</button>
             </div>
             {actionMsg && <div className="action-msg">{actionMsg}</div>}
+          </div>
+
+          <div className="panel">
+            <h2>At a Glance</h2>
+            {(data.projects || []).slice(0, 4).map((p) => <div className="row" key={p.key}><span>{p.name}</span><em className={p.status}>{p.status}</em></div>)}
+            <div className="row"><span>Next Cron</span><em>{fmtTime(data.metrics?.nextCronAtMs)}</em></div>
           </div>
         </aside>
       </div>
