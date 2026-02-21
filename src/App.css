@@ -36,6 +36,11 @@ main {
   margin-bottom: 14px;
 }
 
+.top-actions { display: flex; gap: 10px; align-items: center; }
+.pill { font-size: 0.68rem; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); }
+.pill.live { color: var(--green); border-color: var(--green); }
+.pill.fallback { color: var(--danger); border-color: var(--danger); }
+
 .topbar h1 {
   margin: 0;
   font-size: 1.1rem;
@@ -164,6 +169,10 @@ main {
 }
 
 .row:last-child { border-bottom: none; }
+
+em.clean, em.stable { color: var(--green); font-style: normal; }
+em.dirty, em.drift, em.shipping { color: var(--magenta); font-style: normal; }
+em.unknown { color: var(--muted); font-style: normal; }
 
 .theme-terminal {
   --bg: #040805;
