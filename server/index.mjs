@@ -156,6 +156,43 @@ async function getSkillsOverview() {
   return groups
 }
 
+function deriveAlerts(agents, projects, crons) {
+  const alerts = []
+  const dirty = projects.filter((p) => p.status === 'dirty')
+  const criticalCron = crons.filter((c) => c.lastStatus && c.lastStatus !== 'ok')
+  const activeAgents = agents.filter((a) => a.state === 'active')
+
+  if (criticalCron.length) alerts.push({ level: 'critical', text: `${criticalCron.length} cron job(s) not healthy` })
+  if (dirty.length) alerts.push({ level: 'warn', text: `${dirty.length} project(s) have local changes` })
+  if (!activeAgents.length) alerts.push({ level: 'info', text: 'No agents currently active' })
+  if (!alerts.length) alerts.push({ level: 'info', text: 'All systems nominal' })
+
+  return alerts.slice(0, 5)
+}
+
+function buildTimeline(crons, projects) {
+  const items = []
+  for (const c of crons) {
+    items.push({ label: c.name, atMs: c.nextRunAtMs, kind: 'cron' })
+  }
+  for (const p of projects) {
+    items.push({ label: `${p.name} status: ${p.status}`, atMs: Date.now(), kind: 'project' })
+  }
+  return items
+    .filter((x) => x.atMs)
+    .sort((a, b) => a.atMs - b.atMs)
+    .slice(0, 10)
+}
+
+function buildMetrics(agents, projects, crons) {
+  const activeAgents = agents.filter((a) => a.state === 'active').length
+  const dirtyProjects = projects.filter((p) => p.status === 'dirty').length
+  const healthy = crons.filter((c) => c.lastStatus === 'ok').length
+  const cronHealthyPct = crons.length ? Math.round((healthy / crons.length) * 100) : 0
+  const nextCronAtMs = [...crons].map((c) => c.nextRunAtMs).filter(Boolean).sort((a, b) => a - b)[0] || null
+  return { activeAgents, dirtyProjects, cronHealthyPct, nextCronAtMs }
+}
+
 const overviewCache = { ts: 0, data: null }
 
 app.get('/api/overview', async () => {
@@ -167,7 +204,10 @@ app.get('/api/overview', async () => {
 
     const [agents, crons, projects, skills] = await Promise.all([getSessions(), getCrons(), getProjects(), getSkillsOverview()])
     const projectDetails = await getProjectDetails(crons)
-    const payload = { ok: true, ts: now, agents, crons, projects, projectDetails, skills }
+    const alerts = deriveAlerts(agents, projects, crons)
+    const timeline = buildTimeline(crons, projects)
+    const metrics = buildMetrics(agents, projects, crons)
+    const payload = { ok: true, ts: now, agents, crons, projects, projectDetails, skills, alerts, timeline, metrics }
     overviewCache.ts = now
     overviewCache.data = payload
     return payload

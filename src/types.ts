@@ -16,6 +16,15 @@ export type ProjectDetail = {
 }
 export type SkillsGroup = { base: string; skills: string[] }
 
+export type AlertItem = { level: 'critical' | 'warn' | 'info'; text: string }
+export type TimelineItem = { label: string; atMs: number | null; kind: 'cron' | 'project' | 'agent' }
+export type Metrics = {
+  activeAgents: number
+  dirtyProjects: number
+  cronHealthyPct: number
+  nextCronAtMs: number | null
+}
+
 export type Overview = {
   ok: boolean
   ts?: number
@@ -24,4 +33,7 @@ export type Overview = {
   crons: Cron[]
   projectDetails?: Record<string, ProjectDetail>
   skills?: SkillsGroup[]
+  alerts?: AlertItem[]
+  timeline?: TimelineItem[]
+  metrics?: Metrics
 }
