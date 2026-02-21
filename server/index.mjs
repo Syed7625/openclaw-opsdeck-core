@@ -217,6 +217,7 @@ const localRepoIndexCache = { ts: 0, map: new Map() }
 
 const chatHistory = []     // { id, role, text, ts, status? }
 const chatJobs = new Map() // jobId -> { id, status, text?, error?, ts, userMsgId }
+let chatQueue = Promise.resolve()
 
 // Dedicated session key to avoid lock contention with main agent session
 const CHAT_SESSION_ID = 'mission-control-chat'
@@ -288,7 +289,7 @@ function pushChatMsg(msg) {
   if (chatHistory.length > 200) chatHistory.splice(0, chatHistory.length - 200)
 }
 
-async function executeRelay(text, retries = 0) {
+async function executeRelay(text, retries = 2) {
   // Guardrails: Max input length handling
   const MAX_INPUT_LENGTH = 10000
   const normalizedText = text.length > MAX_INPUT_LENGTH 
@@ -296,29 +297,30 @@ async function executeRelay(text, retries = 0) {
     : text
 
   const args = [
-    '--no-color', 
-    'agent', 
-    '--agent', 'main', 
-    '--message', normalizedText, 
-    '--session-id', CHAT_SESSION_ID, 
-    '--json', 
-    '--timeout', '12'
+    '--no-color',
+    'agent',
+    '--agent', 'main',
+    '--message', normalizedText,
+    '--session-id', CHAT_SESSION_ID,
+    '--thinking', 'low',
+    '--json',
+    '--timeout', '35'
   ]
 
   let lastErr
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       // Use the new robust runCommand instead of bash string interpolation
-      const raw = await runCommand('openclaw', args, { 
-        timeout: 15000, 
-        json: false 
+      const raw = await runCommand('openclaw', args, {
+        timeout: 45000,
+        json: false,
       })
       return extractAgentText(raw)
     } catch (err) {
       lastErr = err
       // Enhanced error reporting
       const diag = err.stderr ? ` (stderr: ${err.stderr.slice(0, 50)})` : ''
-      console.error(`Relay attempt ${attempt} failed: ${err.message}${diag}`)
+      console.error(`Relay attempt ${attempt + 1}/${retries + 1} failed: ${err.message}${diag}`)
       
       // Wait briefly before retry
       if (attempt < retries) await new Promise((r) => setTimeout(r, 1500))
@@ -335,8 +337,11 @@ function enqueueChat(text) {
   const job = { id: jobId, status: 'queued', text: null, error: null, ts: Date.now(), userMsgId: userMsg.id }
   chatJobs.set(jobId, job)
 
-  // Process asynchronously — never blocks the request
-  processJob(jobId, text)
+  // Process asynchronously in-order to avoid session lock contention
+  chatQueue = chatQueue
+    .then(() => processJob(jobId, text))
+    .catch(() => {})
+
   return { jobId, userMsg }
 }
 
@@ -345,12 +350,13 @@ async function processJob(jobId, text) {
   if (!job) return
   job.status = 'running'
 
-  // Handle simple pings without relay
-  if (text.toLowerCase() === 'ping') {
-    const aiMsg = { id: `a-${Date.now()}`, role: 'assistant', text: 'pong', ts: Date.now(), status: 'delivered' }
+  // Handle simple health checks without relay
+  if (/^(ping|test|testing)$/i.test(text.trim())) {
+    const reply = text.trim().toLowerCase() === 'ping' ? 'pong' : 'Received - local chat is live ✅'
+    const aiMsg = { id: `a-${Date.now()}`, role: 'assistant', text: reply, ts: Date.now(), status: 'delivered' }
     pushChatMsg(aiMsg)
     job.status = 'done'
-    job.text = 'pong'
+    job.text = reply
     job.aiMsgId = aiMsg.id
     return
   }
@@ -364,7 +370,7 @@ async function processJob(jobId, text) {
     job.aiMsgId = aiMsg.id
   } catch (err) {
     const diag = err.stderr ? ` [${err.stderr.slice(0, 40)}]` : ''
-    const errText = `Relay error after retry. (${String(err.message || err).slice(0, 100)})${diag}`
+    const errText = `Relay error: ${String(err.message || err)}${diag}`
     const aiMsg = { id: `a-${Date.now()}`, role: 'assistant', text: errText, ts: Date.now(), status: 'error' }
     pushChatMsg(aiMsg)
     job.status = 'error'
