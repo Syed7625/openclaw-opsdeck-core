@@ -124,6 +124,13 @@ export default function CommandPage() {
 
   const visibleMessages = messages.slice(Math.max(viewStartIndex, messages.length - 24))
 
+  useEffect(() => {
+    // Keep the chat pinned to the newest message so users don't have to
+    // manually scroll after each send/receive cycle.
+    if (!chatLogRef.current) return
+    chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight
+  }, [visibleMessages.length, pendingJobs.size])
+
   const positioned = useMemo(() => {
     const active = data.agents.filter((a) => a.state === 'active')
     const idle = data.agents.filter((a) => a.state !== 'active')
