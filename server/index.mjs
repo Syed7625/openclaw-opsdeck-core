@@ -27,23 +27,46 @@ async function getCrons() {
   }))
 }
 
+function aliasNameFromModel(model = '') {
+  const m = model.toLowerCase()
+  if (m.includes('claude-opus')) return 'Opie'
+  if (m.includes('claude-sonnet')) return 'Will'
+  if (m.includes('grok-4') || m.includes('grok-4-1')) return 'Elon'
+  if (m.includes('gemini')) return 'Buzz'
+  if (m.includes('gpt-5.2-pro')) return 'Forge'
+  if (m.includes('gpt-5.2')) return 'Atlas'
+  if (m.includes('kimi')) return 'Kite'
+  if (m.includes('grok-4')) return 'Grok'
+  if (m.includes('gpt-5.3-codex')) return 'Omar'
+  return model || 'Agent'
+}
+
 async function getSessions() {
   const data = await runJson('openclaw sessions --json')
   const now = Date.now()
-  const toAgentName = (s) => (s.model || 'unknown').replace(/^(.*\/)?.*?([a-z0-9-]+)$/i, '$2')
-  return (data.sessions || [])
+  const list = (data.sessions || [])
     .filter((s) => s.key?.includes(':subagent:') || s.key === 'agent:main:main')
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
     .slice(0, 12)
-    .map((s, idx) => {
-      const ageMin = (now - (s.updatedAt || now)) / 60000
-      const state = ageMin < 15 ? 'active' : 'idle'
-      return {
-        id: s.key || String(idx),
-        name: s.key === 'agent:main:main' ? 'Omar' : toAgentName(s),
-        state,
-        load: Math.min(100, Math.max(0, Math.round((s.totalTokens || 0) / 3000))),
-      }
-    })
+
+  const counts = new Map()
+
+  return list.map((s, idx) => {
+    const ageMin = (now - (s.updatedAt || now)) / 60000
+    const state = ageMin <= 2 ? 'active' : 'idle'
+    const base = s.key === 'agent:main:main' ? 'Omar' : aliasNameFromModel(s.modelOverride || s.model || '')
+    const n = (counts.get(base) || 0) + 1
+    counts.set(base, n)
+    const short = (s.key || '').split(':').pop()?.slice(0, 4) || String(idx)
+    const name = n === 1 ? base : `${base}-${short}`
+
+    return {
+      id: s.key || String(idx),
+      name,
+      state,
+      load: Math.min(100, Math.max(0, Math.round((s.totalTokens || 0) / 3000))),
+    }
+  })
 }
 
 async function getProjects() {
