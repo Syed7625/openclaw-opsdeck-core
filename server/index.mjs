@@ -199,6 +199,7 @@ function buildMetrics(agents, projects, crons) {
 }
 
 const overviewCache = { ts: 0, data: null }
+const chatHistory = []
 
 app.get('/api/overview', async () => {
   try {
@@ -232,6 +233,37 @@ app.post('/api/action/run-cron', async (req, reply) => {
     return { ok: true }
   } catch (error) {
     return reply.code(500).send({ ok: false, error: String(error) })
+  }
+})
+
+app.get('/api/chat', async () => ({ ok: true, messages: chatHistory.slice(-80) }))
+
+app.post('/api/chat', async (req, reply) => {
+  const text = String(req.body?.text || '').trim()
+  if (!text) return reply.code(400).send({ ok: false, error: 'text required' })
+
+  const userMsg = { id: `u-${Date.now()}`, role: 'user', text, ts: Date.now() }
+  chatHistory.push(userMsg)
+
+  try {
+    const escaped = text.replace(/"/g, '\\"')
+    const cmd = `openclaw agent --local --message "${escaped}" --json`
+    const raw = await runText(cmd)
+    let replyText = 'No reply body returned.'
+    try {
+      const parsed = JSON.parse(raw)
+      replyText = parsed?.response?.text || parsed?.text || parsed?.output || raw
+    } catch {
+      replyText = raw || 'No reply body returned.'
+    }
+    const aiMsg = { id: `a-${Date.now()}`, role: 'assistant', text: replyText, ts: Date.now() }
+    chatHistory.push(aiMsg)
+    return { ok: true, message: aiMsg }
+  } catch (error) {
+    const errText = `Local agent relay failed: ${String(error)}`
+    const aiMsg = { id: `a-${Date.now()}`, role: 'assistant', text: errText, ts: Date.now() }
+    chatHistory.push(aiMsg)
+    return reply.code(200).send({ ok: true, message: aiMsg, degraded: true })
   }
 })
 

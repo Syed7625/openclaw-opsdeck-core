@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import type { Overview } from '../types'
 
@@ -21,6 +21,8 @@ function fmtTime(ms: number | null | undefined) {
 export default function CommandPage() {
   const data = useOutletContext<Overview>()
   const [actionMsg, setActionMsg] = useState('')
+  const [chatInput, setChatInput] = useState('')
+  const [messages, setMessages] = useState<{ id: string; role: 'user' | 'assistant'; text: string }[]>([])
 
   const runCron = async (name: string) => {
     const job = data.crons.find((c) => c.name === name)
@@ -32,6 +34,25 @@ export default function CommandPage() {
       body: JSON.stringify({ jobId: job.id }),
     })
     setActionMsg(res.ok ? `Triggered: ${name}` : `Failed: ${name}`)
+  }
+
+  useEffect(() => {
+    fetch('/api/chat').then((r) => r.json()).then((j) => setMessages(j.messages || [])).catch(() => {})
+  }, [])
+
+  const sendChat = async () => {
+    const text = chatInput.trim()
+    if (!text) return
+    setChatInput('')
+    const userLocal = { id: `tmp-${Date.now()}`, role: 'user' as const, text }
+    setMessages((m) => [...m, userLocal])
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+    const json = await res.json()
+    if (json?.message) setMessages((m) => [...m, json.message])
   }
 
   const positioned = useMemo(() => {
@@ -94,6 +115,17 @@ export default function CommandPage() {
             <h2>At a Glance</h2>
             {(data.projects || []).slice(0, 4).map((p) => <div className="row" key={p.key}><span>{p.name}</span><em className={p.status}>{p.status}</em></div>)}
             <div className="row"><span>Next Cron</span><em>{fmtTime(data.metrics?.nextCronAtMs)}</em></div>
+          </div>
+
+          <div className="panel chat-panel">
+            <h2>Local Chat</h2>
+            <div className="chat-log">
+              {messages.slice(-12).map((m) => <div key={m.id} className={`chat-bubble ${m.role}`}><strong>{m.role === 'user' ? 'You' : 'Omar'}</strong><p>{m.text}</p></div>)}
+            </div>
+            <div className="chat-input-row">
+              <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Talk to Omar from Mission Control..." onKeyDown={(e) => { if (e.key === 'Enter') sendChat() }} />
+              <button onClick={sendChat}>Send</button>
+            </div>
           </div>
         </aside>
       </div>
