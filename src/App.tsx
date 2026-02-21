@@ -23,6 +23,7 @@ export default function App() {
         <NavLink to="/sites">Sites</NavLink>
         <NavLink to="/crons">Crons</NavLink>
         <NavLink to="/forge">Forge</NavLink>
+        <NavLink to="/repos">Repos</NavLink>
       </nav>
 
       <section className="page-wrap">

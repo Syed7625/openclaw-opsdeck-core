@@ -89,7 +89,7 @@ export default function CommandPage() {
           {positioned.map(a => <div key={a.id} className={`agent ${a.state}`} style={{ transform: `translate(calc(-50% + ${a.x}px), calc(-50% + ${a.y}px))` }}><strong>{a.name}</strong><small>{a.role}</small></div>)}
         </div>
 
-        <aside className="score-column">
+        <aside className="control-column">
           <div className="panel compact-score">
             <h2>Daily Score</h2>
             <div className="score">{Math.max(0, (data.metrics?.cronHealthyPct || 0) - (data.metrics?.dirtyProjects || 0) * 10)}</div>
@@ -97,9 +97,7 @@ export default function CommandPage() {
             <div className="row"><span>Dirty</span><em>{data.metrics?.dirtyProjects ?? 0}</em></div>
             <div className="row"><span>Cron %</span><em>{data.metrics?.cronHealthyPct ?? 0}%</em></div>
           </div>
-        </aside>
 
-        <aside className="sidepanel">
           <div className="panel">
             <h2>Quick Actions</h2>
             <div className="quick-actions">
@@ -117,22 +115,22 @@ export default function CommandPage() {
             <div className="row"><span>Next Cron</span><em>{fmtTime(data.metrics?.nextCronAtMs)}</em></div>
           </div>
 
-          <div className="panel chat-panel">
-            <h2>Local Chat</h2>
-            <div className="chat-log">
-              {messages.slice(-12).map((m) => <div key={m.id} className={`chat-bubble ${m.role}`}><strong>{m.role === 'user' ? 'You' : 'Omar'}</strong><p>{m.text}</p></div>)}
-            </div>
-            <div className="chat-input-row">
-              <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Talk to Omar from Mission Control..." onKeyDown={(e) => { if (e.key === 'Enter') sendChat() }} />
-              <button onClick={sendChat}>Send</button>
-            </div>
+          <div className="panel timeline-panel">
+            <h2>Timeline</h2>
+            {(data.timeline || []).slice(0, 8).map((t, i) => <div className="row" key={`${i}-${t.label}`}><span>{t.label}</span><em>{fmtTime(t.atMs)}</em></div>)}
           </div>
         </aside>
-      </div>
 
-      <div className="panel timeline-panel">
-        <h2>Timeline (Upcoming + Recent)</h2>
-        {(data.timeline || []).map((t, i) => <div className="row" key={`${i}-${t.label}`}><span>{t.label}</span><em>{fmtTime(t.atMs)}</em></div>)}
+        <aside className="chat-column panel chat-panel">
+          <h2>Local Chat</h2>
+          <div className="chat-log full">
+            {messages.slice(-24).map((m) => <div key={m.id} className={`chat-bubble ${m.role}`}><strong>{m.role === 'user' ? 'You' : 'Omar'}</strong><p>{m.text}</p></div>)}
+          </div>
+          <div className="chat-input-row">
+            <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Talk to Omar from Mission Control..." onKeyDown={(e) => { if (e.key === 'Enter') sendChat() }} />
+            <button onClick={sendChat}>Send</button>
+          </div>
+        </aside>
       </div>
     </div>
   )

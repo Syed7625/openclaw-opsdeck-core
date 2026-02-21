@@ -198,7 +198,73 @@ function buildMetrics(agents, projects, crons) {
   return { activeAgents, dirtyProjects, cronHealthyPct, nextCronAtMs }
 }
 
+async function getLocalRepoIndex() {
+  const now = Date.now()
+  if (localRepoIndexCache.map.size && (now - localRepoIndexCache.ts) < 60000) return localRepoIndexCache.map
+  const roots = ['/Users/ewimsatt/Sites', '/Users/ewimsatt/frameworks', '/Users/ewimsatt/.openclaw/workspace', '/Users/ewimsatt/openclaw']
+  const found = new Map()
+  for (const root of roots) {
+    try {
+      const raw = await runText(`find ${JSON.stringify(root)} -maxdepth 3 -type d -name .git -print | sed 's#/\\.git$##'`)
+      const dirs = raw ? raw.split('\n').filter(Boolean) : []
+      for (const d of dirs) {
+        const name = d.split('/').pop()
+        if (!found.has(name)) found.set(name, d)
+      }
+    } catch {}
+  }
+  localRepoIndexCache.ts = now
+  localRepoIndexCache.map = found
+  return found
+}
+
+async function getRepoGrid() {
+  const now = Date.now()
+  if (repoCache.data.length && (now - repoCache.ts) < 60000) return repoCache.data
+
+  let repos = []
+  try {
+    const raw = await runText('gh repo list ewimsatt --limit 200 --json name,nameWithOwner,isPrivate')
+    repos = JSON.parse(raw)
+  } catch {
+    repos = []
+  }
+
+  const localIndex = await getLocalRepoIndex()
+  const out = []
+
+  for (const r of repos) {
+    const localPath = localIndex.get(r.name) || null
+    if (!localPath) {
+      out.push({ name: r.name, fullName: r.nameWithOwner, localPath: null, state: 'missing', ahead: 0, behind: 0, dirty: 0, ageDays: null, heat: 'cool' })
+      continue
+    }
+
+    let ahead = 0, behind = 0, dirty = 0, ageDays = null
+    try {
+      dirty = Number(await runText(`cd ${JSON.stringify(localPath)} && git status --porcelain | wc -l | tr -d ' '`))
+      const lr = await runText(`cd ${JSON.stringify(localPath)} && git rev-list --left-right --count @{u}...HEAD 2>/dev/null || echo "0 0"`)
+      const parts = lr.split(/\s+/).map((x) => Number(x || 0))
+      behind = parts[0] || 0
+      ahead = parts[1] || 0
+      const ts = Number(await runText(`cd ${JSON.stringify(localPath)} && git log -1 --format=%ct 2>/dev/null || echo 0`))
+      if (ts > 0) ageDays = Math.floor((Date.now() / 1000 - ts) / 86400)
+    } catch {}
+
+    const synced = dirty === 0 && ahead === 0 && behind === 0
+    const state = synced ? 'synced' : 'outdated'
+    const heat = ageDays === null ? 'cool' : ageDays > 30 ? 'hot' : ageDays > 14 ? 'warm' : 'cool'
+    out.push({ name: r.name, fullName: r.nameWithOwner, localPath, state, ahead, behind, dirty, ageDays, heat })
+  }
+
+  repoCache.ts = now
+  repoCache.data = out
+  return out
+}
+
 const overviewCache = { ts: 0, data: null }
+const repoCache = { ts: 0, data: [] }
+const localRepoIndexCache = { ts: 0, map: new Map() }
 const chatHistory = []
 
 app.get('/api/overview', async () => {
@@ -208,12 +274,12 @@ app.get('/api/overview', async () => {
       return overviewCache.data
     }
 
-    const [agents, crons, projects, skills] = await Promise.all([getSessions(), getCrons(), getProjects(), getSkillsOverview()])
+    const [agents, crons, projects, skills, repos] = await Promise.all([getSessions(), getCrons(), getProjects(), getSkillsOverview(), getRepoGrid()])
     const projectDetails = await getProjectDetails(crons)
     const alerts = deriveAlerts(agents, projects, crons)
     const timeline = buildTimeline(crons, projects)
     const metrics = buildMetrics(agents, projects, crons)
-    const payload = { ok: true, ts: now, agents, crons, projects, projectDetails, skills, alerts, timeline, metrics }
+    const payload = { ok: true, ts: now, agents, crons, projects, projectDetails, skills, alerts, timeline, metrics, repos }
     overviewCache.ts = now
     overviewCache.data = payload
     return payload

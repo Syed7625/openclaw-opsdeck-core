@@ -27,6 +27,18 @@ export type Metrics = {
   nextCronAtMs: number | null
 }
 
+export type RepoTile = {
+  name: string
+  fullName: string
+  localPath: string | null
+  state: 'synced' | 'outdated' | 'missing'
+  ahead: number
+  behind: number
+  dirty: number
+  ageDays: number | null
+  heat: 'cool' | 'warm' | 'hot'
+}
+
 export type Overview = {
   ok: boolean
   ts?: number
@@ -38,4 +50,5 @@ export type Overview = {
   alerts?: AlertItem[]
   timeline?: TimelineItem[]
   metrics?: Metrics
+  repos?: RepoTile[]
 }

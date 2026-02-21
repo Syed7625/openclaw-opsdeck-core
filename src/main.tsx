@@ -7,6 +7,7 @@ import CommandPage from './pages/CommandPage'
 import SitesPage from './pages/SitesPage'
 import CronsPage from './pages/CronsPage'
 import ForgePage from './pages/ForgePage'
+import ReposPage from './pages/ReposPage'
 
 const router = createBrowserRouter([
   {
@@ -17,6 +18,7 @@ const router = createBrowserRouter([
       { path: 'sites', element: <SitesPage /> },
       { path: 'crons', element: <CronsPage /> },
       { path: 'forge', element: <ForgePage /> },
+      { path: 'repos', element: <ReposPage /> },
     ],
   },
 ])
