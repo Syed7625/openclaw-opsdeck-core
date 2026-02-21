@@ -8,11 +8,13 @@ const app = Fastify({ logger: false })
 
 await app.register(cors, { origin: true })
 
-const SHELL_PREFIX = 'export PATH=/usr/local/Cellar/node@22/22.22.0/bin:$PATH; '
+const TOOL_PATH = `/usr/local/Cellar/node@22/22.22.0/bin:${process.env.PATH || ''}`
 
 async function runJson(command) {
-  const full = `${SHELL_PREFIX}${command}`
-  const { stdout } = await exec(`bash -lc ${JSON.stringify(full)}`, { maxBuffer: 10 * 1024 * 1024 })
+  const { stdout } = await exec(`bash -lc ${JSON.stringify(command)}`, {
+    maxBuffer: 10 * 1024 * 1024,
+    env: { ...process.env, PATH: TOOL_PATH },
+  })
   return JSON.parse(stdout)
 }
 
@@ -86,8 +88,10 @@ const PROJECT_CRON_MAP = {
 }
 
 async function runText(command) {
-  const full = `${SHELL_PREFIX}${command}`
-  const { stdout } = await exec(`bash -lc ${JSON.stringify(full)}`, { maxBuffer: 10 * 1024 * 1024 })
+  const { stdout } = await exec(`bash -lc ${JSON.stringify(command)}`, {
+    maxBuffer: 10 * 1024 * 1024,
+    env: { ...process.env, PATH: TOOL_PATH },
+  })
   return stdout.trim()
 }
 
@@ -312,8 +316,7 @@ app.post('/api/chat', async (req, reply) => {
   chatHistory.push(userMsg)
 
   try {
-    const escaped = text.replace(/"/g, '\\"')
-    const cmd = `openclaw agent --local --message "${escaped}" --json`
+    const cmd = `openclaw agent --agent main --message ${JSON.stringify(text)} --json`
     const raw = await runText(cmd)
     let replyText = 'No reply body returned.'
     try {
