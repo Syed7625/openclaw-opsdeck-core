@@ -22,7 +22,7 @@ export default function CommandPage() {
   const data = useOutletContext<Overview>()
   const [actionMsg, setActionMsg] = useState('')
   const [chatInput, setChatInput] = useState('')
-  const [messages, setMessages] = useState<{ id: string; role: 'user' | 'assistant'; text: string }[]>([])
+  const [messages, setMessages] = useState<{ id: string; role: 'user' | 'assistant'; text: string; status?: string }[]>([])
 
   const runCron = async (name: string) => {
     const job = data.crons.find((c) => c.name === name)
@@ -36,6 +36,10 @@ export default function CommandPage() {
     setActionMsg(res.ok ? `Triggered: ${name}` : `Failed: ${name}`)
   }
 
+  const [pendingJobs, setPendingJobs] = useState<Set<string>>(new Set())
+  const [sending, setSending] = useState(false)
+
+  // Poll chat history (always fast — reads from server memory)
   useEffect(() => {
     let mounted = true
     const load = () => {
@@ -44,26 +48,44 @@ export default function CommandPage() {
       }).catch(() => {})
     }
     load()
-    const t = setInterval(load, 2500)
-    return () => {
-      mounted = false
-      clearInterval(t)
-    }
+    const t = setInterval(load, 1500)
+    return () => { mounted = false; clearInterval(t) }
   }, [])
+
+  // Poll pending jobs for completion
+  useEffect(() => {
+    if (pendingJobs.size === 0) return
+    let mounted = true
+    const poll = setInterval(() => {
+      for (const jobId of pendingJobs) {
+        fetch(`/api/chat/jobs/${jobId}`).then((r) => r.json()).then((j) => {
+          if (!mounted) return
+          if (j?.job?.status === 'done' || j?.job?.status === 'error') {
+            setPendingJobs((prev) => { const next = new Set(prev); next.delete(jobId); return next })
+          }
+        }).catch(() => {})
+      }
+    }, 800)
+    return () => { mounted = false; clearInterval(poll) }
+  }, [pendingJobs])
 
   const sendChat = async () => {
     const text = chatInput.trim()
-    if (!text) return
+    if (!text || sending) return
     setChatInput('')
-    const userLocal = { id: `tmp-${Date.now()}`, role: 'user' as const, text }
-    setMessages((m) => [...m, userLocal])
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    })
-    const json = await res.json()
-    if (json?.message) setMessages((m) => [...m, json.message])
+    setSending(true)
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      const json = await res.json()
+      if (json?.jobId) {
+        setPendingJobs((prev) => new Set(prev).add(json.jobId))
+      }
+    } catch {}
+    setSending(false)
   }
 
   const positioned = useMemo(() => {
@@ -135,11 +157,23 @@ export default function CommandPage() {
         <aside className="chat-column panel chat-panel">
           <h2>Local Chat</h2>
           <div className="chat-log full">
-            {messages.slice(-24).map((m) => <div key={m.id} className={`chat-bubble ${m.role}`}><strong>{m.role === 'user' ? 'You' : 'Omar'}</strong><p>{m.text}</p></div>)}
+            {messages.slice(-24).map((m) => (
+              <div key={m.id} className={`chat-bubble ${m.role} ${m.status === 'error' ? 'error' : ''}`}>
+                <strong>{m.role === 'user' ? 'You' : 'Omar'}</strong>
+                <p>{m.text}</p>
+                {m.status && m.status !== 'delivered' && <span className={`chat-status ${m.status}`}>{m.status}</span>}
+              </div>
+            ))}
+            {pendingJobs.size > 0 && (
+              <div className="chat-bubble assistant processing">
+                <strong>Omar</strong>
+                <p className="typing-indicator">processing<span className="dots">...</span></p>
+              </div>
+            )}
           </div>
           <div className="chat-input-row">
-            <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Talk to Omar from Mission Control..." onKeyDown={(e) => { if (e.key === 'Enter') sendChat() }} />
-            <button onClick={sendChat}>Send</button>
+            <input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Talk to Omar from Mission Control..." onKeyDown={(e) => { if (e.key === 'Enter') sendChat() }} disabled={sending} />
+            <button onClick={sendChat} disabled={sending}>{sending ? '...' : 'Send'}</button>
           </div>
         </aside>
       </div>
