@@ -206,7 +206,7 @@ export default function CommandPage() {
             {pendingJobs.size > 0 && (
               <div className="chat-bubble assistant processing">
                 <strong>Omar</strong>
-                <p className="typing-indicator">processing<span className="dots">...</span></p>
+                <p className="typing-indicator">Typing<span className="dots">...</span></p>
               </div>
             )}
           </div>

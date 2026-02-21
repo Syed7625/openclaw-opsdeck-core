@@ -1,73 +1,93 @@
-# React + TypeScript + Vite
+# OpenClaw OpsDeck
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A lightweight mission-control dashboard for [OpenClaw](https://openclaw.ai). Monitor your agent roster, cron jobs, and chat with your agents — all from one screen.
 
-Currently, two official plugins are available:
+![Command view with round table, cron timeline, and local chat](https://img.shields.io/badge/status-alpha-orange)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## React Compiler
+- **Round Table** — live view of active/idle agents with role labels
+- **Cron Dashboard** — health, next-run times, one-click manual triggers
+- **Local Chat** — send messages to your main agent session directly from the UI
+- **Project Tracking** — optional git-status monitoring for local repos
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Prerequisites
 
-## Expanding the ESLint configuration
+- **Node.js** ≥ 18
+- **OpenClaw CLI** installed and running (`openclaw gateway status` should show running)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Quick Start
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+```bash
+# Clone and install
+git clone https://github.com/your-org/openclaw-opsdeck.git
+cd openclaw-opsdeck
+npm install
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+# (Optional) Create your config
+cp opsdeck.config.example.js opsdeck.config.js
+# Edit opsdeck.config.js to customize agents, projects, ports, etc.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Start both API server and dev UI
+npm run dev:full
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open **http://localhost:4173** in your browser.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Production Build
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build          # outputs to dist/
+npm run api &          # start API server (port 4174)
+npx vite preview       # serve built UI (port 4173)
 ```
+
+## Configuration
+
+Copy `opsdeck.config.example.js` → `opsdeck.config.js` and edit. The file is gitignored.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `apiPort` | `4174` | API server port (or `OPSDECK_API_PORT` env) |
+| `apiHost` | `0.0.0.0` | API bind address (or `OPSDECK_API_HOST` env) |
+| `agents` | built-in roster | Array of `{ model, name, role }` for round table |
+| `chatSessionId` | `opsdeck-chat` | OpenClaw session ID for local chat relay |
+| `projects` | `[]` | Git repos to monitor: `{ key, name, path }` |
+| `projectCronMap` | `{}` | Map project keys → cron job names |
+
+## Architecture
+
+```
+Browser  ←→  Vite dev server (4173)  ←→  /api proxy  ←→  Fastify API (4174)
+                                                            ↕
+                                                      openclaw CLI
+```
+
+The API server calls `openclaw sessions --json` and `openclaw cron list --all --json` to populate the dashboard. Chat messages are relayed via `openclaw agent --message`.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| "fallback" pill stays lit | API server isn't running. Check `npm run api` output. |
+| Chat says "Relay error" | Ensure `openclaw gateway status` shows running. |
+| No agents appear | Your config agents don't match running session models. Check `openclaw sessions --json`. |
+| Port conflict | Set `OPSDECK_API_PORT=5000` or edit `opsdeck.config.js`. |
+| `openclaw: command not found` | Add OpenClaw to your PATH or install globally. |
+
+## Project Structure
+
+```
+server/index.mjs        — Fastify API (crons, sessions, chat relay)
+src/
+  App.tsx               — Shell with nav (Command, Crons)
+  pages/CommandPage.tsx — Round table + alerts + chat
+  pages/CronsPage.tsx   — Cron timeline
+  data.ts               — React hook for /api/overview polling
+  types.ts              — TypeScript types
+opsdeck.config.example.js — Sample configuration
+```
+
+## License
+
+MIT

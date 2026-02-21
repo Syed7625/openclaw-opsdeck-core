@@ -4,10 +4,7 @@ import type { Overview } from './types'
 export const fallback: Overview = {
   ok: true,
   agents: [
-    { id: 'omar', name: 'Omar', state: 'active', load: 70 },
-    { id: 'will', name: 'Will', state: 'active', load: 52 },
-    { id: 'opie', name: 'Opie', state: 'idle', load: 10 },
-    { id: 'buzz', name: 'Buzz', state: 'idle', load: 18 },
+    { id: 'agent-1', name: 'Agent 1', state: 'idle', load: 0 },
   ],
   projects: [],
   crons: [],

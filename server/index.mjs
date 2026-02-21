@@ -3,6 +3,25 @@ import cors from '@fastify/cors'
 import { exec as _exec, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import crypto from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const ROOT = resolve(__dirname, '..')
+
+// Load config file if present
+let config = {}
+const configPath = resolve(ROOT, 'opsdeck.config.js')
+if (existsSync(configPath)) {
+  try {
+    const mod = await import(configPath)
+    config = mod.default || mod
+    console.log('Loaded opsdeck.config.js')
+  } catch (err) {
+    console.warn('Failed to load opsdeck.config.js:', err.message)
+  }
+}
 
 const exec = promisify(_exec)
 const app = Fastify({ logger: false })
@@ -76,16 +95,21 @@ async function runText(command, timeoutMs = 30000) {
 
 // ─── Agent name mapping ─────────────────────────────────────────────────────
 
+// Build model→name lookup from config or defaults
+const DEFAULT_AGENT_MAP = [
+  { model: 'claude-opus', name: 'Opie' },
+  { model: 'claude-sonnet', name: 'Will' },
+  { model: 'grok-4', name: 'Elon' },
+  { model: 'gemini', name: 'Buzz' },
+  { model: 'gpt-5.3-codex', name: 'Omar' },
+]
+const agentMapEntries = config.agents || DEFAULT_AGENT_MAP
+
 function aliasNameFromModel(model = '') {
   const m = model.toLowerCase()
-  if (m.includes('claude-opus')) return 'Opie'
-  if (m.includes('claude-sonnet')) return 'Will'
-  if (m.includes('grok-4') || m.includes('grok-4-1')) return 'Elon'
-  if (m.includes('gemini')) return 'Buzz'
-  if (m.includes('gpt-5.2-pro')) return 'Forge'
-  if (m.includes('gpt-5.2')) return 'Atlas'
-  if (m.includes('kimi')) return 'Kite'
-  if (m.includes('gpt-5.3-codex')) return 'Omar'
+  for (const entry of agentMapEntries) {
+    if (m.includes(entry.model.toLowerCase())) return entry.name
+  }
   return model || 'Agent'
 }
 
@@ -105,7 +129,7 @@ async function getCrons() {
 async function getSessions() {
   const data = await runJson('openclaw sessions --json')
   const now = Date.now()
-  const roster = ['Omar', 'Will', 'Opie', 'Elon', 'Buzz', 'Kite']
+  const roster = agentMapEntries.map((a) => a.name)
   const byName = new Map(roster.map((name) => [name, { id: name.toLowerCase(), name, state: 'idle', load: 0 }]))
 
   const sessions = (data.sessions || []).filter((s) => s.key?.includes(':subagent:') || s.key === 'agent:main:main')
@@ -123,9 +147,13 @@ async function getSessions() {
   return roster.map((name) => byName.get(name))
 }
 
-const PROJECTS = []
+const PROJECTS = (config.projects || []).map((p) => ({
+  key: p.key,
+  name: p.name,
+  path: p.path,
+}))
 
-const PROJECT_CRON_MAP = {}
+const PROJECT_CRON_MAP = config.projectCronMap || {}
 
 async function getProjects() {
   return Promise.all(PROJECTS.map(async (p) => {
@@ -220,7 +248,7 @@ const chatJobs = new Map() // jobId -> { id, status, text?, error?, ts, userMsgI
 let chatQueue = Promise.resolve()
 
 // Dedicated session key to avoid lock contention with main agent session
-const CHAT_SESSION_ID = 'mission-control-chat'
+const CHAT_SESSION_ID = config.chatSessionId || 'opsdeck-chat'
 
 function extractAgentText(raw = '') {
   const text = String(raw || '').trim()
@@ -489,8 +517,8 @@ setTimeout(() => {
 setInterval(() => { refreshFastOverview().catch(() => {}) }, 10000).unref()
 setInterval(() => { refreshHeavyOverview((fastOverviewCache.data?.crons) || []).catch(() => {}) }, 90000).unref()
 
-const port = Number(process.env.OPSDECK_API_PORT || 4174)
-const host = process.env.OPSDECK_API_HOST || '0.0.0.0'
+const port = Number(process.env.OPSDECK_API_PORT || config.apiPort || 4174)
+const host = process.env.OPSDECK_API_HOST || config.apiHost || '0.0.0.0'
 
 app.listen({ port, host })
   .then(() => console.log(`opsdeck api listening on http://${host}:${port}`))
