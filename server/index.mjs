@@ -13,7 +13,49 @@ const TOOL_PATH = `/usr/local/Cellar/node@22/22.22.0/bin:${process.env.PATH || '
 
 // ─── Exec helpers ───────────────────────────────────────────────────────────
 
+async function runCommand(cmd, args = [], options = {}) {
+  const { timeout = 30000, json = false } = options
+  
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, {
+      env: { ...process.env, PATH: TOOL_PATH },
+      shell: false,
+      timeout
+    })
+
+    let stdout = ''
+    let stderr = ''
+
+    child.stdout.on('data', (data) => { stdout += data })
+    child.stderr.on('data', (data) => { stderr += data })
+
+    child.on('error', (err) => {
+      reject(new Error(`Failed to start process: ${err.message}`))
+    })
+
+    child.on('close', (code) => {
+      if (code !== 0) {
+        const error = new Error(`Command failed with exit code ${code}`)
+        error.stdout = stdout
+        error.stderr = stderr
+        return reject(error)
+      }
+      
+      if (json) {
+        try {
+          resolve(JSON.parse(stdout))
+        } catch (err) {
+          reject(new Error(`Failed to parse JSON output: ${err.message}`))
+        }
+      } else {
+        resolve(stdout.trim())
+      }
+    })
+  })
+}
+
 async function runJson(command, timeoutMs = 15000) {
+  // Legacy support for shell strings, but prefer runCommand
   const { stdout } = await exec(`bash -lc ${JSON.stringify(command)}`, {
     maxBuffer: 10 * 1024 * 1024,
     timeout: timeoutMs,
@@ -23,6 +65,7 @@ async function runJson(command, timeoutMs = 15000) {
 }
 
 async function runText(command, timeoutMs = 30000) {
+  // Legacy support for shell strings, but prefer runCommand
   const { stdout } = await exec(`bash -lc ${JSON.stringify(command)}`, {
     maxBuffer: 10 * 1024 * 1024,
     timeout: timeoutMs,
@@ -315,14 +358,37 @@ function pushChatMsg(msg) {
 }
 
 async function executeRelay(text, retries = 0) {
-  const cmd = `openclaw --no-color agent --agent main --message ${JSON.stringify(text)} --session-id ${CHAT_SESSION_ID} --json --timeout 12`
+  // Guardrails: Max input length handling
+  const MAX_INPUT_LENGTH = 10000
+  const normalizedText = text.length > MAX_INPUT_LENGTH 
+    ? text.slice(0, MAX_INPUT_LENGTH) + '... [truncated]' 
+    : text
+
+  const args = [
+    '--no-color', 
+    'agent', 
+    '--agent', 'main', 
+    '--message', normalizedText, 
+    '--session-id', CHAT_SESSION_ID, 
+    '--json', 
+    '--timeout', '12'
+  ]
+
   let lastErr
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const raw = await runText(cmd, 14000)
+      // Use the new robust runCommand instead of bash string interpolation
+      const raw = await runCommand('openclaw', args, { 
+        timeout: 15000, 
+        json: false 
+      })
       return extractAgentText(raw)
     } catch (err) {
       lastErr = err
+      // Enhanced error reporting
+      const diag = err.stderr ? ` (stderr: ${err.stderr.slice(0, 50)})` : ''
+      console.error(`Relay attempt ${attempt} failed: ${err.message}${diag}`)
+      
       // Wait briefly before retry
       if (attempt < retries) await new Promise((r) => setTimeout(r, 1500))
     }
@@ -366,7 +432,8 @@ async function processJob(jobId, text) {
     job.text = replyText
     job.aiMsgId = aiMsg.id
   } catch (err) {
-    const errText = `Relay error after retry. (${String(err).slice(0, 120)})`
+    const diag = err.stderr ? ` [${err.stderr.slice(0, 40)}]` : ''
+    const errText = `Relay error after retry. (${String(err.message || err).slice(0, 100)})${diag}`
     const aiMsg = { id: `a-${Date.now()}`, role: 'assistant', text: errText, ts: Date.now(), status: 'error' }
     pushChatMsg(aiMsg)
     job.status = 'error'
