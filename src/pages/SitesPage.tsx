@@ -29,6 +29,8 @@ export default function SitesPage() {
           <div>
             <h4>In Progress</h4>
             {(detail?.inProgress?.length ? detail.inProgress : ['No active edits detected']).map((x) => <div className="row" key={x}><span>{x}</span></div>)}
+            {typeof detail?.dirtyCount === 'number' && <div className="row"><span>Changed files</span><em>{detail.dirtyCount}</em></div>}
+            {(detail?.changedPaths?.length ? detail.changedPaths : []).map((p) => <div className="row" key={p}><span className="mono-path">{p}</span></div>)}
           </div>
           <div>
             <h4>Scheduled</h4>

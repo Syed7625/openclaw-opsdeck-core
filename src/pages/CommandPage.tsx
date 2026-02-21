@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import type { Overview } from '../types'
 
@@ -20,6 +20,19 @@ function fmtTime(ms: number | null | undefined) {
 
 export default function CommandPage() {
   const data = useOutletContext<Overview>()
+  const [actionMsg, setActionMsg] = useState('')
+
+  const runCron = async (name: string) => {
+    const job = data.crons.find((c) => c.name === name)
+    if (!job) return setActionMsg(`No cron found: ${name}`)
+    setActionMsg(`Running ${name}...`)
+    const res = await fetch('/api/action/run-cron', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: job.id }),
+    })
+    setActionMsg(res.ok ? `Triggered: ${name}` : `Failed: ${name}`)
+  }
 
   const positioned = useMemo(() => {
     const active = data.agents.filter((a) => a.state === 'active')
@@ -67,11 +80,12 @@ export default function CommandPage() {
           <div className="panel">
             <h2>Quick Actions</h2>
             <div className="quick-actions">
-              <button>Run Morning Brief</button>
-              <button>Run Publish</button>
-              <button>Open AncientTravel</button>
-              <button>Open OmarCMS</button>
+              <button onClick={() => runCron('Client Context Brief (Weekday Morning)')}>Run Morning Brief</button>
+              <button onClick={() => runCron('OmarCMS Daily Publish')}>Run Publish</button>
+              <button onClick={() => runCron('Micro Heartbeat (Night)')}>Run Heartbeat</button>
+              <button onClick={() => runCron('Night Owl: Skill Building & Code')}>Run 3AM Code</button>
             </div>
+            {actionMsg && <div className="action-msg">{actionMsg}</div>}
           </div>
         </aside>
       </div>

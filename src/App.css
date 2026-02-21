@@ -54,7 +54,9 @@ em.unknown { color: var(--muted); font-style: normal; }
 .score{font-size:2rem; font-weight:700; color:var(--cyan); margin-bottom:6px}
 .quick-actions{display:grid; gap:6px}
 .quick-actions button{background:rgba(0,240,255,.08); border:1px solid rgba(0,240,255,.35); color:var(--text); border-radius:8px; padding:7px; font-size:.72rem; text-align:left; cursor:pointer}
+.action-msg{margin-top:8px; font-size:.72rem; color:var(--cyan)}
 .timeline-panel{max-height:240px; overflow:auto}
+.mono-path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.68rem; color:var(--muted)}
 
 .sites-layout{display:grid; gap:14px}
 .site-tile{cursor:pointer; text-align:left}

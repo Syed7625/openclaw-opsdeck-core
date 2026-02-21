@@ -13,6 +13,8 @@ export type ProjectDetail = {
   scheduled: ScheduledItem[]
   inProgress: string[]
   done: string[]
+  dirtyCount?: number | null
+  changedPaths?: string[]
 }
 export type SkillsGroup = { base: string; skills: string[] }
 

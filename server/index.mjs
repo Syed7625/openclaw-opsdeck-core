@@ -110,11 +110,14 @@ async function getProjectDetails(crons) {
     let lastCommit = 'unknown'
     let recent = []
     let dirtyCount = null
+    let changedPaths = []
     try {
       lastCommit = await runText(`cd ${JSON.stringify(p.path)} && git log -1 --pretty=format:%h' - '%s' ('%cr')`)
       const recentRaw = await runText(`cd ${JSON.stringify(p.path)} && git log -5 --pretty=format:%s`)
       recent = recentRaw ? recentRaw.split('\n').filter(Boolean) : []
       dirtyCount = Number(await runText(`cd ${JSON.stringify(p.path)} && git status --porcelain | wc -l | tr -d ' '`))
+      const changedRaw = await runText(`cd ${JSON.stringify(p.path)} && git status --porcelain | awk '{print $2}' | head -n 8`)
+      changedPaths = changedRaw ? changedRaw.split('\n').filter(Boolean) : []
     } catch {}
 
     const scheduled = (PROJECT_CRON_MAP[p.key] || []).map((name) => {
@@ -134,6 +137,8 @@ async function getProjectDetails(crons) {
       scheduled,
       inProgress,
       done,
+      dirtyCount,
+      changedPaths,
     }
   }
   return details
@@ -217,6 +222,25 @@ app.get('/api/overview', async () => {
 })
 
 app.get('/api/health', async () => ({ ok: true }))
+
+app.post('/api/action/run-cron', async (req, reply) => {
+  try {
+    const { jobId } = req.body || {}
+    if (!jobId) return reply.code(400).send({ ok: false, error: 'jobId required' })
+    await runText(`openclaw cron run ${JSON.stringify(jobId)}`)
+    overviewCache.ts = 0
+    return { ok: true }
+  } catch (error) {
+    return reply.code(500).send({ ok: false, error: String(error) })
+  }
+})
+
+app.get('/api/meta', async () => {
+  return {
+    ok: true,
+    projects: PROJECTS.map((p) => ({ key: p.key, name: p.name, path: p.path })),
+  }
+})
 
 const port = Number(process.env.OPSDECK_API_PORT || 4174)
 const host = process.env.OPSDECK_API_HOST || '0.0.0.0'
